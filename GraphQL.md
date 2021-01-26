@@ -56,7 +56,7 @@ app.use('/graphql', graphqlHTTP({
 Example:
 <a href="https://imgbb.com/"><img src="https://i.ibb.co/P1VsccQ/image.png" alt="image" border="0" width="350px"></a>
 
-Defing a **User Schema**
+Defing a **User Schema** in schema.js:
 ```js
 const graphql = require('graphql');
 
@@ -77,10 +77,11 @@ const UserType = new GraphQLObjectType({
 ```
 - `GraphQLString` & `GraphQLInt` are types
 
-## Our First Root Query
+## Defining Our First Root Query
 
 <a href="https://imgbb.com/"><img src="https://i.ibb.co/nw0zwd7/image.png" alt="image" border="0" width="350px"></a>
 The root query describes how to find nodes in our graph.
+
 ```js
 const RootQuery = new GraphQLObjectType({
     name: 'RootQueryType',
@@ -98,3 +99,58 @@ const RootQuery = new GraphQLObjectType({
 - `UserType` was defined earler
 - Says: give me `id: {type: GraphQLString}` and I will give you `type: UserType`
 - `resolve` carriers out the query
+- 
+For this example, we'll use a variable as our "database" and lodash to search
+```js
+const _ = require('lodash');
+
+const users = [
+    {id: '23', firstName: 'Bob', age: 20},
+    {id: '54', firstName: 'Alice', age: 30}
+]
+...
+//In RootQuery
+...resolve(parentValue, args){
+    return _.find(users, {id:args.id})
+}
+```
+
+Let's export our RootQuery:
+```js
+module.exports = new GraphQLSchema({
+    query: RootQuery
+})
+```
+And apply it to our GraphQL middleware
+```js
+const schema = require('./schema/schema');
+
+app.use('/graphql', graphqlHTTP({
+    graphiql: true,
+    schema,
+}))
+```
+## Making our First Query
+Using GraphiQL
+```js
+{
+  user(id: "23"){
+    id, 
+    firstName,
+    age
+  }
+}
+```
+will return 
+```js
+{
+  "data": {
+    "user": {
+      "id": "23",
+      "firstName": "Bob",
+      "age": 20
+    }
+  }
+}
+```
+- GraphQL does all the type matching for us, in our `resolve` function we don't have to specify of "type user"
