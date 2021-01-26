@@ -14,6 +14,9 @@
       - [Setup Skaffold](#setup-skaffold)
       - [Error Handling](#error-handling)
       - [Error handling in express](#error-handling-in-express)
+      - [Using Express Validator](#using-express-validator)
+      - [Writing our Error Handler Middleware](#writing-our-error-handler-middleware)
+      - [Handling Express Async Errors](#handling-express-async-errors)
 
 <a id="auth"></a>
 
@@ -185,7 +188,105 @@ export abstract class CustomError extends Error{
 }
 ```
 - We need to call `Object.setPrototypeOf(this, CustomError.prototype);` for built in classes
+- Base `Error` class has a `message` property, so we call `super(message)`
 
 <a id="auth-9"></a>
 #### Error handling in express
 
+If a sync route, throw passes the error to the next middleware
+
+```js
+app.get('/', function(req, res){
+  throw new Error('ERROR')
+})
+```
+
+If an async route, we need to use next
+```js
+  app.get('/', function(req, res, next){
+    fs.readFile('/bad-file', function(err, data){
+      err ? next(err) : res.send(data);
+    })
+  })
+```
+
+**Writing error handlers**
+
+If the middleware has 4 functions, express identifies as error handler
+
+```js
+app.use(function(err, req, res, next){
+  //handle err
+})
+```
+
+#### Using Express Validator
+
+We can use Express Validator to verify results in our request body
+```ts
+import express, {Request, Response} from 'express';
+import {body} from 'express-validator';
+import {validateRequest} from '../middlewares/validate-request';
+
+const router = express.Router();
+
+router.post('/api/users/signin',[
+    body('email').isEmail().withMessage('Email Must be valid'),
+    body('password').trim().notEmpty().withMessage('You must supply a password')
+], validateRequest, async(req:Request, res:Response)=>{
+    ...
+})
+```
+**validateRequest:**
+```ts
+import {Request, Response, NextFunction} from 'express';
+import {validationResult} from 'express-validator';
+
+export const validateRequest = (req: Request, res:Response, next: NextFunction) =>{
+    const errors = validationResult(req);
+
+    if(!errors.isEmpty()){
+        throw new ... //errors.array()
+    }
+
+    next();
+}
+```
+
+#### Writing our Error Handler Middleware
+
+```ts
+import { Request, Response, NextFunction} from 'express';
+import {CustomError} from '../errors/custom-error';
+
+export const errorHandler = (
+  err:Error, 
+  req:Request, 
+  res:Response, 
+  next:NextFunction
+) => {
+    if(err instanceof CustomError){
+        return res.status(err.statusCode).send({errors: err.serializeErrors()});
+    }
+
+    res.status(400).send({
+        errors:[{
+            message: err.message
+        }]
+    })
+}
+```
+- We would add this to our app with ```app.use(errorHandler)```
+
+#### Handling Express Async Errors
+
+Remember that express handles async errors differently: we need to use `next()`
+
+We can get arround this by using the npm library `express-async-errors` right after we import express where we declare app:
+
+```js
+import express from 'express';
+import 'express-async-errors';
+...
+const app = express();
+```
