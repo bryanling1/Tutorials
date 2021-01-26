@@ -90,7 +90,7 @@ const RootQuery = new GraphQLObjectType({
             type: UserType,
             args: {id: {type: GraphQLString}},
             resolve(parentValue, args){
-                ... //return user
+                return axios.get('/some-url').then(res => res.data)
             },
         }
     }
@@ -99,21 +99,7 @@ const RootQuery = new GraphQLObjectType({
 - `UserType` was defined earler
 - Says: give me `id: {type: GraphQLString}` and I will give you `type: UserType`
 - `resolve` carriers out the query
-- 
-For this example, we'll use a variable as our "database" and lodash to search
-```js
-const _ = require('lodash');
-
-const users = [
-    {id: '23', firstName: 'Bob', age: 20},
-    {id: '54', firstName: 'Alice', age: 30}
-]
-...
-//In RootQuery
-...resolve(parentValue, args){
-    return _.find(users, {id:args.id})
-}
-```
+- `.then(res => res.data)` because of how **axios** returns data
 
 Let's export our RootQuery:
 ```js
@@ -154,3 +140,76 @@ will return
 }
 ```
 - GraphQL does all the type matching for us, in our `resolve` function we don't have to specify of "type user"
+
+## Our First Relation
+Let's say each user has a company Id associated with it:
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/kXLP6hc/image.png" alt="image" border="0"></a>
+
+Define our company schema
+```js
+const CompanyType = new GraphQLObjectType({
+    name: 'Company',
+    fields: ()=> ({
+        id: {type: GraphQLString},
+        name: {type: GraphQLString},
+        description: {type: GraphQLString}
+    })
+});
+```
+We can then add this type to our `Users` schema
+```js
+const UserType = new GraphQLObjectType({
+    name: 'User',
+    fields: ()=> ({
+        id: {type: GraphQLString},
+        firstName: {type: GraphQLString},
+        age: {type: GraphQLInt},
+        company: {
+            type: CompanyType
+        }
+    })
+})
+```
+- We use `fields: ()=>({})` because `fields: {}` will cause a JS error if we are using GraphQLObjectType that are defined later in the code
+  
+Let's say our **database** looks like this: 
+```json
+{
+    "users": [
+        {"id":"23", "firstName": "Bill", "age": 20, "companyId":"1"},
+        {"id":"22", "firstName": "Alice", "age": 22,  "companyId":"2"},
+        {"id": "24", "firstName": "Gwen", "age": 25, "companyId":"2"}
+    ],
+    "companies": [
+        {"id":"1", "name": "Apple", "description":"iphone"},
+        {"id":"2", "name":"Google", "description": "search"}
+    ]
+}
+```
+Comparing our **User schema** to the **database**, :
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/Yy0kK6K/image.png" alt="image" border="0"></a>
+
+We need to write a resolve to match the **User's companyId** with the id of the company from the **database**
+
+```js
+const UserType = new GraphQLObjectType({
+    ...
+        company: {
+            type: CompanyType,
+            resolve(parentValue, args){
+                return axios.get(`http://localhost:3000/companies/${parentValue.companyId}`)
+                        .then(res=>res.data)
+            }
+        },
+})
+```
+- `parentValue` contains the data from our **User**
+
+Our current process:
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/LRMNdsG/image.png" alt="image" border="0"></a>
+- `args` is `id:"23"`
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/1Jjnx4j/image.png" alt="image" border="0"></a>
+- Each arrow is a `resolve` function
+
