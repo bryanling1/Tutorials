@@ -17,6 +17,6 @@ Create a db.json file
 Startup in package.json
 ```json
 "scripts": {
-    "json:server": "json-server --watch db.json"
+    "server": "json-server --watch db.json"
   },
 ```
