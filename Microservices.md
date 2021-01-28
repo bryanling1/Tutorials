@@ -17,6 +17,11 @@
       - [Using Express Validator](#using-express-validator)
       - [Writing our Error Handler Middleware](#writing-our-error-handler-middleware)
       - [Handling Express Async Errors](#handling-express-async-errors)
+      - [Adding a Mongo Database](#adding-a-mongo-database)
+      - [Adding Mongoose to our Project](#adding-mongoose-to-our-project)
+      - [Creating a User MongoDB Model](#creating-a-user-mongodb-model)
+      - [Getting Typescript and Mongoose to Work Together](#getting-typescript-and-mongoose-to-work-together)
+      - [User Creation](#user-creation)
 
 <a id="auth"></a>
 
@@ -290,3 +295,157 @@ import 'express-async-errors';
 ...
 const app = express();
 ```
+
+#### Adding a Mongo Database
+
+First create our deployment: 
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-mongo-depl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-mongo
+  template:
+    metadata:
+      labels:
+        app: auth-mongo
+    spec:
+      containers:
+        - name: auth-mongo
+          image: mongo
+```
+
+Create a ClusterIP service in the same file:
+
+```yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-mongo-srv
+spec:
+  selector:
+    app: auth-mongo
+  ports:
+    - name: db
+      protocol: TCP
+      port: 27017
+      targetPort: 27017
+```
+- `27017` is the default listening port for mongodb
+- If we **delete** or **restart** the pod, we will lose all of its data
+
+#### Adding Mongoose to our Project
+
+Let's connect to our MongoDB pod (in the /auth directory)
+```js
+try{
+  await mongoose.connect('mongodb://auth-mongo-srv:27017/auth', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    useCreateIndex: true
+  })
+}
+catch(err){
+  console.log(err);
+}
+```
+- `auth-mongo-srv` is what we set as `name` from our **ClusterIP's metadata**
+- if a `/auth` collection doesn't exist, MongoDB will create on for us
+
+#### Creating a User MongoDB Model
+
+Create a new folder /models
+
+Create a schema for our User model:
+```js
+import mongoose from 'mongoose';
+
+const userSchema = new mongoose.Schema({
+  email: {
+    type: string,
+    required: true,
+  },
+  password:{
+    type: string,
+    required: true,
+  }
+})
+
+const User = mongoose.model({'User', userSchema})
+
+export {User};
+```
+
+#### Getting Typescript and Mongoose to Work Together
+
+Two Issues we want to solve: 
+1. We cant TypeScript to check that we are providing the correct properties when creating a user
+2. Make TypeScript understand that there will be other properties other than the ones we provide on creation
+   
+**Issue 1**
+Instead of writing `new User({})` we are going to create our own function.
+That way we can to type checking in TypeScript.
+
+We can add a static function to our `User` model.
+
+With our `userSchema`:
+```ts
+interface UserAttrs{
+  email: string;
+  password: string;
+}
+
+userSchema.statics.build = (attrs: UserAttrs) => {
+  return new User(attrs)
+}
+```
+
+However, if we try to run `User.build({})` TypeScript will throw an error. We have to tell TypeScript that `.build()` exists on our **User Model**
+
+```ts
+interface UserModel extends mongoose.Model<any>{
+  build(attrs: UserAttrs):any;
+}
+
+const User = mongoose.model<any, UserModel>({'User', userSchema})
+```
+**Issue 2**
+Now we need to describe the properties that a **User Document** has
+
+
+Let's apply this interface
+```ts
+interface UserModel extends mongoose.Model<UserDoc>{
+  build(attrs: UserAttrs):UserDoc;
+}
+
+const User = mongoose.model<UserDoc, UserModel>({'User', userSchema})
+```
+- Replace all `any` from before with our `UserDoc` interface
+
+#### User Creation
+Let's import our `User` model into our Signup Route
+```ts
+const {email, password} = req.body;
+
+const existingUser = await User.findOne({email});
+
+//if the user exists
+if(existingUser){
+  throw new BadRequest('Email in use')
+}
+
+const user = User.build({email, password});
+await user.save();
+
+res.status(201).send(user);
+```
+- We create a user by using the static `build({})` method we created earlier
+- We would create a `BadRequest()` error from our `CustomError` abstract class
+  - We used a statusCode of **400**
