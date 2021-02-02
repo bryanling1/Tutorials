@@ -1,10 +1,7 @@
 # GraphQL
 
 [Stephen Grider Course](https://www.udemy.com/course/graphql-with-react-course/)
-## Table of contents
-
-- [GraphQL](#graphql)
-  - [Table of contents](#table-of-contents)
+## Table of Contents
   - [1. REST-ful](#1-rest-ful)
   - [2. Query Example](#2-query-example)
   - [3. Express and GraphQL](#3-express-and-graphql)
@@ -16,6 +13,15 @@
   - [9. Query Fragments](#9-query-fragments)
   - [10. Our First Mutation](#10-our-first-mutation)
   - [11. GraphQL Clients](#11-graphql-clients)
+  - [12. Setting Up Apollo Client](#12-setting-up-apollo-client)
+  - [13. Our First React Query](#13-our-first-react-query)
+  - [14. Query Variables](#14-query-variables)
+  - [15. First React Mutation](#15-first-react-mutation)
+  - [16. Cache Flow/Rerunning Queries](#16-cache-flowrerunning-queries)
+  - [17. Combining Query and Mutation to a Component](#17-combining-query-and-mutation-to-a-component)
+  - [18. Passing Query Variables](#18-passing-query-variables)
+  - [19. Apollo Store Caching/Normalizing with dataIdFromObject](#19-apollo-store-cachingnormalizing-with-dataidfromobject)
+  - [19. Optimistic Responses](#19-optimistic-responses)
 
 <a id="1"></a>
 ## 1. REST-ful
@@ -342,3 +348,183 @@ We can also use **Apollo Server** instead of **GraphQL Express**
 
 <a href="https://imgbb.com/"><img src="https://i.ibb.co/KNKsCcq/image.png" alt="image" border="0"></a>
 
+## 12. Setting Up Apollo Client
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/f4xNr78/image.png" alt="image" border="0"></a>
+
+```js
+import ApolloClient from 'apollo-client';
+import { AppolloPrivder } from 'react-apollo';
+
+const client = new ApolloClient({});
+
+const Root = () => {
+  return(
+    <ApolloClient client={client}>
+      ...
+    </ApolloClient>
+  )
+}
+
+ReactDOM.render(
+  <Root/>,
+  ...
+);
+```
+- `ApolloClient({})` assumes we are using `/graphql` on our backend
+
+## 13. Our First React Query
+
+Example project in React
+<a href="https://ibb.co/0FCHbV3"><img src="https://i.ibb.co/jWynXZF/image.png" alt="image" border="0"></a>
+<a href="https://ibb.co/Cbf6Jjr"><img src="https://i.ibb.co/sKZC5TB/image.png" alt="image" border="0"></a>
+
+Let's write a query to get all the song titles:
+```js
+import gql from 'graphql-tag';
+
+const query = gql`
+  {
+    songs{
+      title
+    }
+  }
+`
+
+```
+- GraphQL is not valid Javacsript, so we use `graphlql-tag`;
+
+Now we need to combine this query with a component:
+
+```js
+import {graphql} from 'apollo-client';
+
+...
+
+export default graphql(query)(SomeComponent)
+```
+
+<a href="https://ibb.co/y8VcJ1z"><img src="https://i.ibb.co/K9mpHkt/image.png" alt="image" border="0"></a>
+
+- Now we can access the data in props
+
+The object that is returned has a `loading` property which is useful for rendering data
+
+```jsx
+<div>
+{props.data.loading && <div>Loading</div>}
+{!props.data.loading && renderSongs()}
+</div>
+```
+
+## 14. Query Variables
+
+Used when we want to inject a variable into a gql query
+<a href="https://ibb.co/rFfxrvN"><img src="https://i.ibb.co/djJPY7x/image.png" alt="image" border="0"></a>
+In GraphiQL:
+<a href="https://ibb.co/NTBvrLW"><img src="https://i.ibb.co/phF7Q34/image.png" alt="image" border="0"></a>
+
+- Same for queries, but write `query` instead of `mutation`
+
+## 15. First React Mutation
+
+```jsx
+const mutation = gql`
+  mutation AddSong($title: String){
+    addSong(title: $title){
+      title
+    }
+  }
+`
+
+export default graphql(mutation)(Component);
+```
+
+Now we can call via:
+
+```js
+props.mutate({
+  variables:{
+    title: title_var
+  }
+})
+```
+- returns a promise
+
+## 16. Cache Flow/Rerunning Queries
+
+If we render **"songs"** and then make a new one, we will not see our newest **song**
+<a href="https://ibb.co/5smzBZ1"><img src="https://i.ibb.co/MPrjMdg/image.png" alt="image" border="0"></a>
+
+We need to rerun our query
+
+```js
+props.mutate({
+  variables: {title: titleVar},
+  refetchQueries: [{ query:queryVar, variables:variablesVar }]
+})
+
+```
+- Use the `refetchQueries` property
+- If we try to run 2 of the same query, GraphQL will detect this for us
+
+We can also:
+```js
+props.mutate({...}).then(()=> props.data.refetch())
+```
+- Only works with `props.data` is associated with the mutation
+## 17. Combining Query and Mutation to a Component
+
+```js
+export default graphql(mutation)(
+  graphql(query)(component)
+)
+```
+
+## 18. Passing Query Variables
+
+```js
+export default graphql(fetchSone,{
+  options: (props) => {return {variables: {id: props.params.id}}}
+})(Component)
+```
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/nL4gswK/image.png" alt="image" border="0"></a>
+
+## 19. Apollo Store Caching/Normalizing with dataIdFromObject
+
+Currently, Apollo store cannot identify what we are rendinering:
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/92HLL5D/image.png" alt="image" border="0"></a>
+
+We need to tell it to do this so it can rerender our component: 
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/ysP8v1W/image.png" alt="image" border="0"></a>
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/72VSh0T/image.png" alt="image" border="0"></a>
+
+When we first define our client:
+```js
+const client = new ApolloClient({
+  dataIdFromObject: o => o.id
+})
+```
+- Now evertime we return an id from a mutation, Apollo will know to rerender
+
+## 19. Optimistic Responses
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/qRQvNqx/image.png" alt="image" border="0"></a>
+
+```js
+const onLike = (id, likes) =>{
+  props.mutate({
+    variables: ...,
+    optimisticResponse:{
+      __typename: 'Mutation',
+      likeLyric: {
+        id: id,
+        __typename: 'LyricType',
+        likes: likes + 1
+      }
+    }
+  })
+}
+```
+- `likeLyric` is the type of data
