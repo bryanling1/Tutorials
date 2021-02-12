@@ -1,8 +1,9 @@
 #React
 
 ## Table of contents
-[Getting Previous Props](#getting-previous-props)
-## Getting previous props
+- [Table of contents](#table-of-contents)
+- [Previous Props Hook](#previous-props-hook)
+## Previous Props Hook
 ```jsx
 import {useRef} from 'react';
 
