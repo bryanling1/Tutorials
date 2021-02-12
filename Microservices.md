@@ -22,6 +22,12 @@
       - [Creating a User MongoDB Model](#creating-a-user-mongodb-model)
       - [Getting Typescript and Mongoose to Work Together](#getting-typescript-and-mongoose-to-work-together)
       - [User Creation](#user-creation)
+      - [Password Hashing](#password-hashing)
+      - [Intercept Mongoose save attempt with Password logic](#intercept-mongoose-save-attempt-with-password-logic)
+      - [Authentication strategies](#authentication-strategies)
+      - [Solving Issues with Option 2](#solving-issues-with-option-2)
+      - [JWT vs Cookie](#jwt-vs-cookie)
+      - [Authentication Requirements](#authentication-requirements)
 
 <a id="auth"></a>
 
@@ -449,3 +455,132 @@ res.status(201).send(user);
 - We create a user by using the static `build({})` method we created earlier
 - We would create a `BadRequest()` error from our `CustomError` abstract class
   - We used a statusCode of **400**
+
+#### Password Hashing
+
+We're going to create a class the handles passwords
+
+```ts
+import {scrypt, randomBytes} from 'crypto';
+import {promisify} from 'util'
+
+const scryptAsync  = promsifu(scrypt);
+
+export class Password{
+  static async toHash(password:string){
+    ...
+  }
+  static compare(storedPassword:string, suppliedPassword:string){
+    ...
+  }
+}
+```
+
+To hash a password:
+```ts
+static async toHash(password:string){
+  const salt = randomBytes(8).toString('hex');
+  const buffer = (await scriptAsync(password, salt, 64)) as Buffer;
+  return `${bugger.toString('hex').salt}`
+}
+```
+- We use as Buffer to tell TypeScript the typing
+  
+To compare, we apply the `salt` to some other string
+```ts
+static compare(storedPassword:string, suppliedPassword:string){
+  const [hashedPassword, salt] = storedPassword.split('.');
+  const buffer = (await scriptAsync(suppliedPassword, salt, 64)) as Buffer;
+
+  return buffer.toString('hex') === hashedPassword;
+}
+```
+
+#### Intercept Mongoose save attempt with Password logic
+
+```ts
+userSchema.pre('save', async function(done){
+  if (this.isModified('password')){
+    const hashed = await Password.toHash(this.get('password'));
+    this.set('password', hashed);
+  }
+  done();
+})
+```
+- Middleware applied before a user is saved
+- Mongoose does not have great async support. After we are done, we are responsible for calling `done()`
+- We don't use an **arrow function** because `this.` referse to the **user document** instead of **the context of the file** (not overwritten)
+- We use an `if` statement, because we only want to hash the password if it has been modified
+
+#### Authentication strategies
+
+There is no one right way
+
+**1. Individual services rely on the auth services**
+
+<a href="https://ibb.co/vXDrSbf"><img src="https://i.ibb.co/y4VMrDK/image.png" alt="image" border="0"></a>
+- If the authentication services goes down, all services that are **dependent will fail**
+
+**1.1 Authentication gateway**
+<a href="https://ibb.co/frNHvQC"><img src="https://i.ibb.co/qmgp5xR/image.png" alt="image" border="0"></a>
+
+**2. Tell each service how a user is Authenticated**
+<a href="https://ibb.co/z6pDZDk"><img src="https://i.ibb.co/Y0mwhwr/image.png" alt="image" border="0"></a>
+- Not outside dependices
+- Duplicate code (not a big deal, we can make it a class)
+- If a user is "banned" on one service, their JWT may still be valid to another service. There is **no centralized** check
+
+#### Solving Issues with Option 2
+
+We can implement a system where the JWT expires after some time.
+
+If the user's token is expired, we go tell the user to log back in.
+
+<a href="https://ibb.co/fX61fCc"><img src="https://i.ibb.co/4FvmzjQ/image.png" alt="image" border="0"></a>
+- Short lived because the JWT refreshes every 15 seconds anyway
+
+#### JWT vs Cookie
+
+**Cookies:** 
+- Transport mechanism
+- Moves any kind of data between vrwoser and server
+- Automatically manged by the browser
+<a href="https://ibb.co/YRFTMqk"><img src="https://i.ibb.co/FxLqMjw/image.png" alt="image" border="0"></a>
+
+**JWT:**
+- A Authentication/Authorization mechanism
+- Stores any data we want
+- We have to mange it manually
+<a href="https://ibb.co/wywtn1H"><img src="https://i.ibb.co/v1Q9N85/image.png" alt="image" border="0"></a>
+
+#### Authentication Requirements
+
+<a href="https://ibb.co/S3pXywP"><img src="https://i.ibb.co/Nyz6C2s/image.png" alt="image" border="0"></a>
+
+- We need to know information about the user: Has credit card to buy, is admin user, etc.
+
+- We need a secure way to expire our JWT after a period of time
+
+- Mechanism should be understood by multiple different languages: We might have express for auth, ruby on rails for orders services, etc.
+
+- Must not require some kind of backing data store
+
+JWT allows us to meet these requirements!
+
+But, we still need a transport mechanism. 
+
+We can do this in 3 ways:
+
+<a href="https://ibb.co/fxV8kk9"><img src="https://i.ibb.co/mcrv990/image.png" alt="image" border="0"></a>
+
+We will use server side rendering for SEO and page speed on older devices
+
+<a href="https://ibb.co/d2dp2JW"><img src="https://i.ibb.co/DCxMCgV/image.png" alt="image" border="0"></a>
+
+The problem:
+<a href="https://ibb.co/HpzmSP3"><img src="https://i.ibb.co/BKZ8p6F/image.png" alt="image" border="0"></a>
+
+That means we only have one solution: JWT!
+<a href="https://ibb.co/sWWpkxH"><img src="https://i.ibb.co/5KKXtpF/image.png" alt="image" border="0"></a>
+
+We can get around this with service workers, but we do not cover this in this course
