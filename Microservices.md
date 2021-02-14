@@ -28,6 +28,10 @@
       - [Solving Issues with Option 2](#solving-issues-with-option-2)
       - [JWT vs Cookie](#jwt-vs-cookie)
       - [Authentication Requirements](#authentication-requirements)
+      - [Adding cookie-session](#adding-cookie-session)
+      - [Generating JWT](#generating-jwt)
+      - [Storing secrets with Kubernetes](#storing-secrets-with-kubernetes)
+      - [Normalizing responses](#normalizing-responses)
 
 <a id="auth"></a>
 
@@ -584,3 +588,122 @@ That means we only have one solution: JWT!
 <a href="https://ibb.co/sWWpkxH"><img src="https://i.ibb.co/5KKXtpF/image.png" alt="image" border="0"></a>
 
 We can get around this with service workers, but we do not cover this in this course
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/s9hg0qS/image.png" alt="image" border="0"></a>
+
+#### Adding cookie-session
+`npm install cookie-session @types/cookie-session`
+
+Wire it up as a middleware
+
+```ts
+app.use(
+  cookieSession({
+    signed: false,
+    secure: true
+  })
+)
+
+```
+- `signed` is `false` because we are not encrypting the cookie
+- `secure` is https
+
+Since express is under a proxy with nginx, we need to tell express this is okay. Right after we declare our app:
+```ts
+const app = express();
+app.set('trust proxy', true);
+```
+
+Now we can access on `req.session`
+
+#### Generating JWT
+`npm install jsonwebtoken @types/jsonwebtoken`
+
+Right after our user signup, we will generate:
+
+```ts
+import jwt from 'jsonwebtoken'
+...
+await user.save();
+const userJwt = jwt.sign({
+  id: user.id,
+  email: user.email
+}, 'our private key')
+
+req.session = {
+  jwt: userJwt
+}
+```
+
+#### Storing secrets with Kubernetes
+
+<a href="https://ibb.co/R7JSKwv"><img src="https://i.ibb.co/TrNTG3v/image.png" alt="image" border="0"></a>
+- access via environment variable
+
+`kubectl create secret generic jwt-secret --from-literal=JWT_KEY=asdf`
+- `generic` is a type of secret
+- `jwt-secret` is what we named in
+- Need to re-run everytime we restart out cluster
+
+We can get a list of all our secrets with: `kubectl get secrets`
+
+Now we have to tell our auth service to reference that secret:
+
+```yaml
+    ...
+    spec:
+      containers:
+        - name: auth
+          image: bryanling/auth]
+          env:
+            - name: JWT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: jwt-secret
+                  key: JWT_KEY
+```
+- If k8s cannot find the secret, it will fail to run the pod
+
+Now we can use that env in our project
+
+We should do a check for Typescript at the very beginning of our server:
+
+```ts
+const start = async() =>{
+  if(!process.env.JWT_KEY){
+    throw new Error('JWT_KEY must be defined')
+  }
+  ...
+}
+```
+Anywhere else in the code, we can just use `process.env.JWT_KEY` as we can be confident it is defined
+
+#### Normalizing responses
+<a href="https://ibb.co/CzddMZ2"><img src="https://i.ibb.co/rmPPcSs/image.png" alt="image" border="0"></a>
+- For example: MongoDB has id as _id
+
+We can override how Javascript converts an object to JSON
+
+```js
+const person = {name: 'alex', toJSON(){1}}
+
+console.log(person)
+//returns "1"
+```
+
+We can use this same idea when defined our **Mongoose Schemas**
+
+```ts
+const userSchema = new mongoose.Schema({...}, 
+{
+  toJSON: {
+    transform(doc, ret){
+      ret.id = ret._id;
+      delete ret._id;
+      delete ret.password;
+      delete ret.__V;
+    }
+  }
+})
+```
+- `delete` is JS, allows to remove a property from an object
