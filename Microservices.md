@@ -32,6 +32,17 @@
       - [Generating JWT](#generating-jwt)
       - [Storing secrets with Kubernetes](#storing-secrets-with-kubernetes)
       - [Normalizing responses](#normalizing-responses)
+  - [Testing](#testing)
+      - [Scope of testing](#scope-of-testing)
+      - [Testing Routes](#testing-routes)
+      - [Dependencies](#dependencies)
+      - [Test Environment Setup](#test-environment-setup)
+      - [Writing our first routes test (signup)](#writing-our-first-routes-test-signup)
+      - [Note on test-js](#note-on-test-js)
+      - [Testing Failed Requests](#testing-failed-requests)
+      - [Testing Cookies](#testing-cookies)
+      - [Passing cookies](#passing-cookies)
+  - [Server-Side-Rendering our React App](#server-side-rendering-our-react-app)
 
 <a id="auth"></a>
 
@@ -707,3 +718,235 @@ const userSchema = new mongoose.Schema({...},
 })
 ```
 - `delete` is JS, allows to remove a property from an object
+
+## Testing
+
+#### Scope of testing
+
+We are going to test each service individually. 
+
+**Test Goals**
+1. Basic request handling
+2. Mongoose models
+3. Event emitting + receiving
+
+We are going to run these tests directly from our terminal without using docker
+
+This implies our **local environment** is capable of running each service
+
+More complex projects may make this hard (talk about this later)
+
+<a href="https://ibb.co/xScFWrB"><img src="https://i.ibb.co/wNbcV2P/image.png" alt="image" border="0"></a>
+
+#### Testing Routes
+
+<a href="https://ibb.co/m5MYBrT"><img src="https://i.ibb.co/3mL8s5d/image.png" alt="image" border="0"></a>
+
+We are going to reconfigure our auth service that just exports the express app
+
+#### Dependencies
+
+`npm install --save-dev @types/jest @types/suerptest jest ts-jest supertest mongodb-memory-server`
+
+We don't want to have to reinstall these dev dependencies, so in the docker file for our auth service we can write
+
+```docker
+...
+RUN npm install --only=prod
+...
+```
+
+#### Test Environment Setup
+We are going to add a script in our package.json
+```json
+"scripts":{
+  ...
+  "test":"jest --watchAll --no-chache"
+}
+```
+- `--no-chache` because Jest does not always recognise when we **change Typescript files**
+
+Also in our package.json:
+```json
+"jest":{
+  "preset":"ts-jest",
+  "testEnvironment":"node",
+  "setupFilesAfterEnv":[
+    "./src/test/setup.ts"
+  ]
+}
+```
+
+Let's create `"./src/test/setup.ts"`
+
+Imports
+```ts
+import {MongoMemoryServer} from 'mongodb-memory-server';
+import mongoose from 'mongoose';
+import {app} from '../app';
+```
+- `app` is our express app
+
+Setup the mongo memory server 
+```ts
+let mongo:any;
+beforeAll(async()=>{
+  mongo = new MongoMemoryServer();
+  const mongoUri = await mongo.getUri();
+
+  await.mongoose.connect(mongoUri, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  })
+})
+```
+
+Before ever test we want to delete all the collections:
+```ts
+beforeEach(async()=>{
+  const collections = await mongoose.connection.db.collections();
+
+  for(let collection of collections){
+    await collection.deleteMany({})
+  }
+})
+```
+
+And disconnect after every test
+
+```ts
+afterAll(async()=>{
+  await mongo.stop();
+  await mongoose.connection.close();
+})
+```
+
+#### Writing our first routes test (signup)
+
+In our routes folder (following jest convention) we will create:
+
+- &#95;&#95;test&#95;&#95;
+  - signup.test.ts
+
+```ts
+import request from 'supertest';
+import {app} from '../../app';
+
+it('returns a 201 on succesful signup', async()=>{
+  return request(app)
+    .post('/api/users/signup')
+    .send({
+      email: 'test@test.com',
+      password: 'password'
+    })
+    .expect(201)
+})
+```
+
+If we try to run `npm run test` now, we will get a 400 error.
+
+This is because when we create our **JWT**, we are checking for `process.env.JWT_KEY` which our test does not hav access to.
+
+Quick fix, we can make sure we define this environment variable before our test
+
+```ts
+let mongo:any;
+beforeAll(async()=>{
+  process.env.JWT_KEY = '12341234124';
+  ...
+})
+```
+
+#### Note on test-js
+
+Sometimes even after we update our Typescript, our tests may fail. Sometimes jest or ts-jest does not detect changes we make to our files. 
+
+All we have to do is rerun `npm run test`
+
+#### Testing Failed Requests
+With supertest
+```ts
+it('returns a 400 with an invalid email', async()=>{
+  await request(app)
+    .post('/api/users/signup')
+    .send({
+      email: 'asefsadfsef',
+      password: 'password'
+    })
+    .expect(400);
+})
+```
+- As long as we put `await`, Jest will automatically return for us. Useful for when we have to create a user first and sign in etc.
+
+#### Testing Cookies
+```ts
+it('sets a cookie after successful signup', async()=>{
+  const response = await request(app)
+    .post('/api/users/signup')
+    .send({
+      email: 'test@test.com',
+      password: 'password'
+    })
+    .expect(201);
+  
+  expect(respons.get('Set-Cookie')).toBeDefined();
+})
+```
+- We can tell a cookie is set by inspecting the reponse's header
+- This test will fail because our reponse is not secure in our test environment. Let's make a change to our express app for cookies (secure property):
+  ```ts
+  app.use(
+    cookieSession({
+      signed: false,
+      secure: process.env.NODE_ENV !== 'test'
+    })
+  )
+  ```
+
+#### Passing cookies
+
+Supertest does not automatically send cookie data after each request. We can accomplish passing by simply extracting the cookie from the response and setting it in the following:
+
+```ts
+const response = await request(app)...
+
+const cookie = response.get('Set-Cookie');
+
+await request(app).set('Cookie', cookie)...
+```
+We can make this more straight forward by creating a helper function.
+
+We are going to write a global function, but we can also put this inside a nother file.
+
+```ts
+declare global{
+  namespace NodeJS{
+    interface Global{
+      signin(): Promise<string[]>
+    }
+  }
+}
+
+global.signin = async () =>{
+  const email = 'test@test.com';
+  const password = 'password';
+
+  const response = await request(app)
+    .post('api/users/signup')
+    .send({
+      email,
+      password
+    })
+    .expect(201);
+  
+  const cookie = reqponse.get('Set-Cookie');
+
+  return cookie;
+}
+```
+Now we can get our cookie with 
+```ts 
+  const cookie = await global.signin()
+```
+
+## Server-Side-Rendering our React App
