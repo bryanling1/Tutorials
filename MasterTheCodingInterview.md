@@ -7,6 +7,7 @@
 - [Linked Lists](#linked-lists)
   - [Reversing a linked list](#reversing-a-linked-list)
   - [M, N reversal](#m-n-reversal)
+  - [Flattening doubly linked list with children](#flattening-doubly-linked-list-with-children)
 # Palindromes
 
 - Often appear as string sub problems
@@ -16,6 +17,8 @@
   - Left to right pointers on 2 strings
 
 # Linked Lists
+
+Reasigning values always envolves some sort of temp variable
 ## Reversing a linked list
 ```js
 const reverseList = function(head) {
@@ -92,3 +95,5 @@ Return the conditional head
 if(m>1) return head;
 return newList;
 ```
+
+## Flattening doubly linked list with children
