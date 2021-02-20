@@ -43,6 +43,16 @@
       - [Testing Cookies](#testing-cookies)
       - [Passing cookies](#passing-cookies)
   - [Server-Side-Rendering our React App](#server-side-rendering-our-react-app)
+      - [Getting started with NextJS](#getting-started-with-nextjs)
+      - [Building our Next app Image](#building-our-next-app-image)
+      - [Adding our app to Kubernetes](#adding-our-app-to-kubernetes)
+      - [Note on file change detection](#note-on-file-change-detection)
+      - [Wiring up Bootstrap](#wiring-up-bootstrap)
+      - [Account Signup](#account-signup)
+      - [The useRequest Custom Hook](#the-userequest-custom-hook)
+      - [Figuring out if the user is signed in](#figuring-out-if-the-user-is-signed-in)
+      - [2 NextJS with Ingress Nginx Solutions](#2-nextjs-with-ingress-nginx-solutions)
+      - [More on `.getInitialProps`](#more-on-getinitialprops)
 
 <a id="auth"></a>
 
@@ -950,3 +960,328 @@ Now we can get our cookie with
 ```
 
 ## Server-Side-Rendering our React App
+
+<a href="https://ibb.co/6JkhmZ4"><img src="https://i.ibb.co/XkqBb4z/image.png" alt="image" border="0"></a>
+
+#### Getting started with NextJS
+
+We will create a client folder as such:
+- client
+  - package.json
+  - pages
+    - index.js
+  
+`npm init -y` then `npm install next react react-dom`
+
+NextJS will interpret the pages folder as distinct routes in our application
+
+In our package.json
+```json
+...
+"scripts":{
+  "dev":"next"
+}
+...
+```
+
+For this app, we will not use TS
+
+#### Building our Next app Image
+
+Let's create a Dockerfile in our client directory:
+```docker
+FROM node:alpine
+
+WORKDIR /app
+COPY package.json
+RUN npm install
+COPY . .
+
+CMD ["npm", "run", "dev"]
+```
+
+And a docker ignore file:
+
+```
+node_modules
+
+.next
+```
+
+Make sure we push this up to dockerHub
+#### Adding our app to Kubernetes
+
+Creating client-deply.yaml
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: client-depl
+spec:
+  replicas: 1
+  selector: 
+    MatchLabels:
+      app: client
+  template:
+    metadata:
+      labels:
+        app: client
+    spec:
+      containers:
+        - name: client
+        image: bryanling/client
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: client-srv
+spec: 
+  selector:
+    app: client
+  ports:
+    - name: client
+      protocol: TCP
+      port: 3000
+      targetPort: 3000
+```
+
+Let's update our scaffold.yaml file:
+```yaml
+...
+    - image: bryanling/client
+      context: client
+      docker: 
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: '**/*.js'
+          dest: .
+```
+
+Finally, we need to update our ingree configuration so we can access our next app from the outside world
+
+```yaml
+...
+      - path: /?(.*)
+        backend:
+          serviceName: client-srv
+          servicePort: 3000
+```
+- We want to list this last because the array matches the paths in order
+
+#### Note on file change detection
+
+NextJS sometimes struggles to see file changes. We can add some config to help:
+
+In our `client` folder, create `next.config.js`
+```js
+module.exports = {
+  webpackDevMiddleware: config => {
+    config.watchOptions.poll = 300;
+    return config
+  }
+}
+```
+
+This change is applied on start, so we need to restart the pod with `kubectl delete pod podid`. The pod will then automatically restart
+
+We can also restart the pod if we still fail to see changes to our js files
+
+#### Wiring up Bootstrap
+
+First `npm install bootstrap`
+
+In our pages folder, we will create `_app.js`
+```js
+import 'bootstrap/dist/css/bootstrap.css';
+
+export default ({Component, pageProps}) => {
+  return <Component {...pageProps}>
+}
+```
+- Whenever we go to a route in our `pages` folder, Next will pass our react component to `Component`, acts as a wrapper
+- We can only import globals through this file (bootstrap in this case)
+
+#### Account Signup
+
+```tsx
+import axios from 'axios';
+
+const onSubmit = async event =>{
+  event.preventdefault();
+  try{
+    const response = await axios.post('/api/users/signup', {
+      email, password
+    })
+  }catch(e){
+    setError(e)
+  }
+}
+```
+- This will automatically set the cookie. You can chen in inspect element, network tab
+
+#### The useRequest Custom Hook
+
+<a href="https://ibb.co/Lrkf8NY"><img src="https://i.ibb.co/qCywdJ7/image.png" alt="image" border="0"></a>
+
+```tsx
+import axios from 'axios';
+import {useState} from 'react';
+
+export default({url, method, body}) =>{
+  const [errors, setErrors] = useState(null);
+
+  const doRequest = async () =>{
+    try{
+      const response = await axios[method](url, body);
+      return response.data
+    }catch(err){
+      setErrors(
+        <div>{err.response.data.errors.map(err=><div key={err}>{err}</div>)}</div>
+      )
+    }
+  }
+
+  return {doRequest, errors}
+}
+```
+
+Now we can use back in our signup form
+
+```tsx
+const {doRequest, erros} = useRequest({
+  url: 'api/users/signup',
+  method: 'post',
+  body:{
+    email, password
+  }
+})
+
+const onSubmit = async event =>{
+  event.preventdefault();
+  doRequest();
+}
+```
+
+Let's add a callback so we can redirect the user
+
+To redirect, we can use:
+
+```jsx
+import Router from 'next/router';
+
+Router.push('/')
+```
+
+Back at our hook
+```jsx
+export default({url, method, body, onSuccess}) =>{
+  ...
+  try{
+    ...
+    if(onSuccess){
+      onSuccess();
+    }
+  }catch(err){
+    ...
+  }
+  return {doRequest, errors}
+}
+```
+
+#### Figuring out if the user is signed in 
+<a href="https://ibb.co/p2FWbyL"><img src="https://i.ibb.co/0qbBmtG/image.png" alt="image" border="0"></a>
+
+We need to figure out how to send a request while our Next JS application is building
+
+<a href="https://ibb.co/LRm5XWb"><img src="https://i.ibb.co/T26LxSp/image.png" alt="image" border="0"></a>
+
+```jsx
+const LandingPage = ({color}) =>{
+  return <div>{color}</div>
+}
+
+LandingPage.getInitialProps = () =>{
+  return {color: 'red'}
+}
+
+export default LandingPage
+```
+- with `.getInitialProps`, we can set props on the component
+- `.getInitialProps` is executed on the server
+
+Now we can use this to make a request to `/api/users/currentuser`
+
+```js
+import axios from 'axios';
+
+...
+LandingPage.getInitialProps = async () =>{
+  const response = await axios.get('/api/users/currentuser')
+  return {color: 'red'}
+}
+```
+- we can't use our `getRequest` custom hook because `.getInitialProps` is not a component
+- we are also not allowed to fetch data from inside a component during the server side rendering process
+
+If we run this now we will get this error:
+
+<a href="https://ibb.co/StMG2B3"><img src="https://i.ibb.co/5rSwdLR/image.png" alt="image" border="0"></a>
+
+Becuase we only called `/api/users/currentuser` in axios, our browser assumes we are using the same domain as the client.
+
+<a href="https://ibb.co/37xQZJS"><img src="https://i.ibb.co/JKYgJhr/image.png" alt="image" border="0"></a>
+
+However, since NextJS is running inside of its own container, it tries to map the domain
+with itself (its own 1270.0.0.1) and has no reference to nginx's load balancer
+
+#### 2 NextJS with Ingress Nginx Solutions
+
+Tell ther server side to access a different route
+<a href="https://ibb.co/82wk63Q"><img src="https://i.ibb.co/L6yKnws/image.png" alt="image" border="0"></a>
+- **Option #2** uses the name/domain of our k8s services. This is not ideal because we have to remember the names and which routes correspond to those services
+- **Option #1:** Luckily, all that information is already encoded in **Ingress Nginx**
+- The question is **what domain** do we use inside a cluster to talk to **Ingress Nginx**
+
+We also need to keep information about cookies
+
+<a href="https://ibb.co/2g9yhxs"><img src="https://i.ibb.co/SRjPybd/image.png" alt="image" border="0"></a>
+
+We need to pass the cookie from the original request off to **Ingress Nginx**
+
+We need to cross namespaces
+
+<a href="https://ibb.co/PCnsGm5"><img src="https://i.ibb.co/6sxc0n4/image.png" alt="image" border="0"></a>
+
+To figure out services that run **insde the ingress-nginx namespace**, we run:
+```bash
+kubectl get services -n ingress-nginx
+```
+
+The name of the **Load balancer** service is also **ingress-nginx**, the domain we use
+is `http://ingress-nginx.ingress-nginx.svc.cluster.local/api/users/currentuser`
+
+We can create an **External Name Service** to make this name easier
+
+<a href="https://ibb.co/pW9wcRS"><img src="https://i.ibb.co/Q81QLC4/image.png" alt="image" border="0"></a>
+
+We won't do this in this class
+
+#### More on `.getInitialProps`
+
+<a href="https://ibb.co/pysmjRC"><img src="https://i.ibb.co/HdMJTxm/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/5sT7pST"><img src="https://i.ibb.co/vL1tyT1/image.png" alt="image" border="0"></a>
+
+To see whether we are on the server or the browser:
+
+```js
+LandingPage.getInitialProps = async () => {
+  if (typeof window === 'undefined'){
+    //we are on the server
+  }else{
+    //we are on the browwer
+  }
+  return{};
+}
+```
