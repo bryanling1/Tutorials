@@ -53,6 +53,9 @@
       - [Figuring out if the user is signed in](#figuring-out-if-the-user-is-signed-in)
       - [2 NextJS with Ingress Nginx Solutions](#2-nextjs-with-ingress-nginx-solutions)
       - [More on `.getInitialProps`](#more-on-getinitialprops)
+      - [Passing through cookies](#passing-through-cookies)
+      - [Creating a Reusable API Client](#creating-a-reusable-api-client)
+      - [Passing `GetInitialProps` to rest of components](#passing-getinitialprops-to-rest-of-components)
 
 <a id="auth"></a>
 
@@ -1279,9 +1282,143 @@ To see whether we are on the server or the browser:
 LandingPage.getInitialProps = async () => {
   if (typeof window === 'undefined'){
     //we are on the server
+    const response = await axios.get(
+      'http://ingress-nginx.ingress-nginx.svc.cluster.local/api/users/currentuser',
+      {
+        headers:{
+          Host: 'ticketing.dev'
+        }
+      }
+    );
+
+    return response.data
+
   }else{
     //we are on the browwer
+    const response = await axios.get('/api/users/currentUser');
+
+    return response.data;
   }
   return{};
 }
 ```
+
+- Remeber in our *ingress-nginx* service file, we said to point to `ticketing.dev`. 
+
+- When the request comes from the browser, nginx understands their trying to access `ticketing.dev`. 
+
+- But with our server request, there is nothing that tells nginx to use that domain. So we must supply it in the `header`
+  
+- Currently this request will give us `null` because we telling nginx to pass along cookies
+
+#### Passing through cookies
+
+We can get the `req` property off of `.getInitialProps`
+
+```js
+LandingPage.getInitialProps = async ({headers}) => {
+  if (typeof window === 'undefined'){
+    //we are on the server
+    const response = await axios.get(
+      'http://ingress-nginx.ingress-nginx.svc.cluster.local/api/users/currentuser',
+      {
+        headers: req.headers
+      }
+    );
+
+    return response.data
+
+  }else{
+    ...
+  }
+}
+```
+
+#### Creating a Reusable API Client
+<a href="https://ibb.co/XyKHWWF"><img src="https://i.ibb.co/tZvRHHY/image.png" alt="image" border="0"></a>
+
+Create `/api/buildClient`
+
+```js
+import axios from 'axios';
+
+export default ({req}) => {
+  if(typeof window === 'undefined'){
+    //we are on the server
+    return axios.create({
+      baseURL: 'http://ingress...',
+      headers: req.headers
+    })
+  }else{
+    return axios.create({
+      baseUrl: '/'
+    })
+  }
+}
+```
+
+Back in our landing page:
+```js
+import buildClient from 'api/buildClient';
+
+LandingPage.getInitialProps = async(context) =>{
+  const client = await buildCuild(context);
+  const {data} = client.get('/api/usres/currentuser');
+  return data;
+}
+```
+
+#### Passing `GetInitialProps` to rest of components
+
+We are going to setup `GetInitialProps` on our root `_app` and there are a couple of things we have to do that are different from **Page components**
+
+<a href="https://ibb.co/k9KQLtt"><img src="https://i.ibb.co/jWhgCSS/image.png" alt="image" border="0"></a>
+
+In `_app.js`
+```js
+const AppComponent = ({Component, pageProps}) =>{
+  return(
+    ...
+  )
+}
+
+AppComponent.getInitialProps = async appContext => {
+  const client = buildClient(appContext.ctx);
+  const {data} = client.get('/api/users/currentuser');
+
+  return data
+}
+...
+```
+- But now our `.getInitialProps` on our **page components** will not get evoked automitacally
+
+We can get all of the `.getInitialProps` from all of our pages like so:
+
+```js
+AppComponent.getInitialProps = async appContext => {
+  ...
+  let pageProps = {};
+  if (appContext.Component.getInitialProps){
+    pageProps = await appContext.Component.getInitialProps(appContext.ctx)
+  }
+
+  return data
+}
+```
+- `appContext` has many other properties aswell
+
+Now to pass these props to all of our components, we would return:
+
+```js
+AppComponent.getInitialProps = async appContext => {
+  ...
+
+  return {
+    pageProps,
+    ..data
+  }
+}
+```
+
+
+
