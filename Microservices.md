@@ -56,6 +56,14 @@
       - [Passing through cookies](#passing-through-cookies)
       - [Creating a Reusable API Client](#creating-a-reusable-api-client)
       - [Passing `GetInitialProps` to rest of components](#passing-getinitialprops-to-rest-of-components)
+  - [NPM Setup](#npm-setup)
+      - [Shared logic Between Services](#shared-logic-between-services)
+      - [Options for Code sharing](#options-for-code-sharing)
+      - [Publishing NPM Modules](#publishing-npm-modules)
+      - [NPM and Typescript](#npm-and-typescript)
+      - [Publish command](#publish-command)
+      - [Better Importing](#better-importing)
+      - [Updating](#updating)
 
 <a id="auth"></a>
 
@@ -1420,5 +1428,127 @@ AppComponent.getInitialProps = async appContext => {
 }
 ```
 
+## NPM Setup
 
+<a href="https://ibb.co/Fz89ZJW"><img src="https://i.ibb.co/6FD29bZ/image.png" alt="image" border="0"></a>
+
+#### Shared logic Between Services
+<a href="https://ibb.co/jVcvNP8"><img src="https://i.ibb.co/mvLCjVR/image.png" alt="image" border="0"></a>
+
+#### Options for Code sharing
+
+1. Copy and past code
+   - Won't know when files change, hard to document over time
+2. Git Submodule
+   - Challening commands
+3. Publishing as an npm package
+   - We can version the code
+   - Can be tedious
+
+#### Publishing NPM Modules
+
+We create a director called `common` that will share code between all of our services
+
+In our `package.json`
+
+```json
+{
+  "name": "@orgnanization_name/name"
+}
+```
+
+In order to publish a package, everything in tte package has to be committed with git. Create with `git init`
+
+First make sure we're logged in: 
+```bash
+npm login
+```
+
+Once we commit are changes and want to publish:
+
+```bash
+npm publish --access public 
+```
+- need `--access public` or else npm will want to publish as `private` (costs money)
+
+#### NPM and Typescript
+<a href="https://ibb.co/cwYVgpQ"><img src="https://i.ibb.co/dtmxW3D/image.png" alt="image" border="0"></a>
+
+```bash
+tsc --init
+```
+Install `typescript` and `del-cli`
+
+```bash
+npm instal typescript del-cli --save-dev
+```
+
+In our package.json
+```json
+"scripts": {
+  "clean": "del ./build/*",
+  "build": "npm run clean && tsc"
+}
+```
+- `del` ensures deleted our build folder so on `npm run build` we have the latest build
+
+In our tsconfig.json:
+```json
+{
+  "decleration": true,
+  "outDir": "./build"
+}
+```
+
+#### Publish command
+
+In package.json:
+```json
+{
+  "main":"./build/index.js",
+  "types": "./build/index.d.ts",
+  "files":[
+    "./build/**/*"
+  ]
+}
+```
+- the `main` property specifies the directory of our imports
+- the `types` property specifies the directory of our types imports
+- the `files` property specifies which files to include in the package
+
+We should also add a `.gitignore`:
+```
+build
+node_modules
+```
+
+We can increment the version number in our `package.json` by updating it manually or by running:
+
+```
+npm version patch
+```
+
+Then to publish: 
+
+```
+npm run build
+```
+```
+npm run publish
+```
+
+#### Better Importing
+
+To simply imports for the importer, in index.ts we can add all the imports
+
+```ts
+export * from './path/file_1';
+export * from './path/file_2';
+...
+```
+- We also need to make sure that dependecies of these imports are reflected in the `package.json` dpendecies by `npm install`ing them (includes `@types`)
+
+#### Updating
+
+Once are packaged is updated to npm, we can update any projects using it with `npm update @organization/name`
 
