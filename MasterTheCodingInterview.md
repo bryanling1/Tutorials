@@ -6,7 +6,7 @@
 - [Palindromes](#palindromes)
 - [Linked Lists](#linked-lists)
   - [Reversing a linked list](#reversing-a-linked-list)
-  - [M, N reversal](#m-n-reversal)
+  - [M to N reversal](#m-to-n-reversal)
   - [Flattening doubly linked list with children](#flattening-doubly-linked-list-with-children)
 # Palindromes
 
@@ -18,7 +18,9 @@
 
 # Linked Lists
 
-Reasigning values always envolves some sort of temp variable
+- Reasigning values always envolves some sort of temp variable
+- Make sure that switching values you check for edge cases where the value is `null`
+- 99% of the time the **iterative** of approach has a better space and time complexity of the **recursive** one
 ## Reversing a linked list
 ```js
 const reverseList = function(head) {
@@ -50,7 +52,7 @@ const reverseList = function(head){
   return new_head
 }
 ```
-## M, N reversal
+## M to N reversal
 
 Given a linked list and numbers m and n, return it back with only positions m to n in reverse.
 
@@ -97,3 +99,43 @@ return newList;
 ```
 
 ## Flattening doubly linked list with children
+
+<a href="https://ibb.co/QKTs4tR"><img src="https://i.ibb.co/qrcbvVf/image.png" alt="image" border="0"></a>
+
+- Recursive has O(n) space complexity
+
+- Merging bottom is the same as merging from top, so iterably is the best approach
+
+- To merge, we need the **head**, **tail** (head.next), the **childHead** (head.child), and the **childTail**
+
+```js
+const flatten = function(head){
+//check for if head is null
+if(!head) return head;
+
+let currentNode = head;
+
+//iterate through
+while (currentNode !== null){
+  //no child? advance
+  if(currentNode.child === null){
+    currentNode = currentNode.next;
+  }else{
+    //we found a child, we want to start merging
+    //we need to find the **childTail**
+    let tail = currentNode.child;
+    while(tail.next !== null){
+      tail = tail.next
+    }
+    //we have our 4 values, now we can set them
+    tail.next = currentNode.next
+    if(tail.next !== null){
+      tail.next.prev = tail;
+    }
+    currentNode.next = currentNode.child;
+    currentNode.next.prev = currentNode;
+    currentNode.child = null;
+  }
+}
+}
+```
