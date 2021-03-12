@@ -83,6 +83,12 @@
       - [Event Redelivery](#event-redelivery)
       - [NATS listeners as a class](#nats-listeners-as-a-class)
       - [Extending the Listener](#extending-the-listener)
+      - [Overview](#overview)
+      - [Custom Publisher](#custom-publisher)
+      - [Event Definitions Summary](#event-definitions-summary)
+      - [Publishing Ticket Creation Event](#publishing-ticket-creation-event)
+      - [Adding NATS client to our ticketing service](#adding-nats-client-to-our-ticketing-service)
+      - [Creating NatsWrapper Class](#creating-natswrapper-class)
 
 <a id="auth"></a>
 
@@ -2157,3 +2163,182 @@ stan.on('connect', ()=>{
 })
 
 ```
+We should also add correct typecript types to help
+
+#### Overview
+<a href="https://ibb.co/g6bLkp3"><img src="https://i.ibb.co/2501GQy/image.png" alt="image" border="0"></a>
+
+#### Custom Publisher
+
+We are going to create `base-publichser.ts`
+```ts
+import {Stan} from 'node-nats-streaming';
+import {Subjects} from './subjects';
+
+interface Event{
+  subject: Subjects;
+  data: any;
+}
+
+export abstract class Publisher<T extends Event>{
+  abstract subject: T['subject'];
+  private client: Stan;
+
+  constructor(client: Stan){
+    this.client = client;
+  }
+
+  publish(data: T['data']):Promise<void> {
+    return new Promise((resolve, reject)=>{
+        this.client.publish(this.subject, JSON.stringify(data), (err)=>{
+        if (err) {
+          return reject(err);
+        }
+        resolve();
+      })
+    })
+  }
+}
+```
+
+Now create `ticket-created-publisher.ts`
+
+```ts
+import {Publisher} from './base-publisher';
+import {TicketCreatedEvent} from './ticket-created-event';
+import {Subjects} from './subjects';
+
+export class TicketCreatedPublisher extends Publisher<TicketCreatedEvent>{
+  subject: Subjects.TicketCreated = Subjects.TicketCreated;
+}
+```
+Now in `publisher.ts`
+
+```ts
+stan.on('connect', async ()=>{
+  console.log('Publisher connected to NATS');
+
+  const publisher = new TicketCreatePublisher(stan);
+  await publisher.publish({
+    id: '123',
+    title: 'concert',
+    price: 20
+  })
+})
+```
+
+#### Event Definitions Summary 
+
+<a href="https://ibb.co/WWNmWBr"><img src="https://i.ibb.co/xSKxSzn/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/Dr2M3LB"><img src="https://i.ibb.co/cYn8zxW/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/XCJTdjP"><img src="https://i.ibb.co/KryHQbg/image.png" alt="image" border="0"></a>
+
+
+#### Publishing Ticket Creation Event
+
+Inside out `tickets/events` service directory, we will create `ticket-created-publisher.ts`
+
+```ts
+import { Publisher, Subjects, TicketCreatedEvent } from '@bltechTickets/common';;
+
+export class TicketCreatedPublisher extends Publisher<TicketCreatdEvent>{
+  subject: Subjects.TicketCreated = Subjects.TicketCreated;
+}
+```
+
+Now in our routes directory
+
+```ts
+import { TicketCreatedPublisher } from '../events/ticket-created-publisher';
+
+...
+await.ticket.save();
+new TicketCreatedPublisher(client).publish({
+  id: ticket.id,
+  title: ticket.title,
+  price: ticket.price,
+  userId: ticket.userId
+});
+```
+- We should pull off `title` and `price` from `await.ticket.save()` intstead of `req.body` becuase our mongoose might sanatize the data in different ways
+- We need to add nats `client`in our ticketing service
+
+#### Adding NATS client to our ticketing service
+
+<a href="https://ibb.co/ZWWsQRN"><img src="https://i.ibb.co/LnnwTDv/image.png" alt="image" border="0"></a>
+
+We need to share our NATS client, but want to avoid creating circular dependecies
+
+We will do this:
+
+<a href="https://ibb.co/vhCfDPn"><img src="https://i.ibb.co/zFWCNRv/image.png" alt="image" border="0"></a>
+
+When we used mongoose:
+```ts
+try{
+  await mongoose.connect(...)
+}
+catch(err){
+  ...
+}
+```
+we were able to then access this mongoose connection globablly in our `ticketing` service
+
+We want to do something similar with our NATS client
+
+<a href="https://ibb.co/sC6YfXb"><img src="https://i.ibb.co/0KFb7zm/image.png" alt="image" border="0"></a>
+
+We create one instance and export it, and that instance is shared throughout our project
+
+<a href="https://ibb.co/Brnpj6h"><img src="https://i.ibb.co/z76Mb23/image.png" alt="image" border="0"></a>
+
+We will create this in `ticketing/nats-wrapper.ts`
+
+```ts
+import nats, { Stan } from 'node-nats-streaming';
+
+class NatsWrapper{
+  ...
+}
+
+export const natsWrapper = new NatsWrapper();
+```
+
+#### Creating NatsWrapper Class
+
+```ts
+class NatsWrapper{
+  private _client?: Stan;
+
+  connect(clusterId: string, clientId: string, url: string){
+    this._client = nats.connect(clusterId, clientId, {url});
+
+    return new Promise((resolve, reject) => {
+      this._client.on('connect', () =>{
+        console.log('Connected to NATS')
+        resolve();
+      })
+
+      this._client.on('error', (err) => {
+        reject(err);
+      })
+    })
+    
+  }
+}
+```
+
+Now we can use this similar to `mongoose.connect`
+
+In `ticketing/index.ts`
+
+```ts
+try{
+  await natsWrapper.connect('ticketing', 'abc123', 'http://nats_srv:4222')
+  await mongoose.connect(...)
+}
+```
+-`http://nats_srv:4222` comes from our kubernetes pod
+- ticketing is the id we specified in `.yaml` file

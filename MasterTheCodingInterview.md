@@ -10,6 +10,7 @@
   - [Flattening doubly linked list with children](#flattening-doubly-linked-list-with-children)
       - [Cycle Detection](#cycle-detection)
         - [Floyd's Tortoise and Hare Algorithm](#floyds-tortoise-and-hare-algorithm)
+      - [Minimum Brackets to Remove](#minimum-brackets-to-remove)
 # Palindromes
 
 - Often appear as string sub problems
@@ -154,3 +155,37 @@ while (currentNode !== null){
 - If **hair** is null  or **hair.next** is null, you do not have a cycle (found the tail)
 
 <a href="https://ibb.co/4t9yWgw"><img src="https://i.ibb.co/c3M5JXK/image.png" alt="image" border="0"></a>
+
+#### Minimum Brackets to Remove
+
+```ts
+ var minRemoveToMakeValid = function(s) {
+    const stack = [];
+    const res = s.split('');
+    for(let i=0; i<s.length; i++){
+        const char = s.charAt(i);
+        if(char !== "(" && char !== ")" ){
+            continue;
+        }
+
+        if(char === "("){
+            stack.push(i)
+        }else{
+            //")"
+            if(stack.length > 0){
+                stack.pop()
+            }else{
+                res[i] = '';
+            }
+        }
+    }
+
+    for(let i=0; i<stack.length; i++){
+        res[stack[i]] = '';
+    }
+
+    return res.join('');
+
+};
+```
+- set `.split()` elements to `''` will remove them when we `.join()`
