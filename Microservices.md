@@ -64,6 +64,25 @@
       - [Publish command](#publish-command)
       - [Better Importing](#better-importing)
       - [Updating](#updating)
+  - [Ticketing Service](#ticketing-service)
+      - [Mongo Setup](#mongo-setup)
+      - [Writing tests for our routes](#writing-tests-for-our-routes)
+      - [Ticket Mongoose Model](#ticket-mongoose-model)
+      - [Testing Document Creations](#testing-document-creations)
+      - [Testing getting a ticket](#testing-getting-a-ticket)
+      - [Updating a ticket](#updating-a-ticket)
+  - [NATS Streaming Server - An Event Bus Implementation](#nats-streaming-server---an-event-bus-implementation)
+      - [Creating a NATS Streaming Deployment](#creating-a-nats-streaming-deployment)
+      - [Big Notes on NATS Streaming](#big-notes-on-nats-streaming)
+      - [Building a NATS Test Project](#building-a-nats-test-project)
+      - [Client ID Generation](#client-id-generation)
+      - [More Subscribe Options](#more-subscribe-options)
+      - [Client Health Checks](#client-health-checks)
+      - [Core Concurrency Issues](#core-concurrency-issues)
+      - [Solving Concurrency Issues](#solving-concurrency-issues)
+      - [Event Redelivery](#event-redelivery)
+      - [NATS listeners as a class](#nats-listeners-as-a-class)
+      - [Extending the Listener](#extending-the-listener)
 
 <a id="auth"></a>
 
@@ -459,7 +478,12 @@ const User = mongoose.model<any, UserModel>({'User', userSchema})
 ```
 **Issue 2**
 Now we need to describe the properties that a **User Document** has
-
+```ts
+interface UserDoc extends mongoose.Document{
+    email: string;
+    password: string;
+}   
+```
 
 Let's apply this interface
 ```ts
@@ -1552,3 +1576,584 @@ export * from './path/file_2';
 
 Once are packaged is updated to npm, we can update any projects using it with `npm update @organization/name`
 
+## Ticketing Service
+
+<a href="https://ibb.co/9ZcZtMN"><img src="https://i.ibb.co/3R4RzJ7/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/59ysBGG"><img src="https://i.ibb.co/FWM8gmm/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/5s7XPD1"><img src="https://i.ibb.co/9yMm7Xp/image.png" alt="image" border="0"></a>
+
+#### Mongo Setup
+
+We are connecting to a different instance of MongoDB
+
+Let's set the URL as an environment variable
+
+in `tickets-deply.yaml`
+
+```yaml
+...
+    spec:
+      containers:
+        - name: tickets
+          image: bryanling/tickets
+          env:
+            - name: MONGO_URI
+              value: mongodb://tickets-mongo-srv:27017/tickets
+```
+
+In our `index.ts`, we also need to check this exists:
+```ts
+if (!process.env.MONGO_URI){
+  throw new Error('MONGO_URI must be defeind')
+}
+
+try{
+  await mongoose.connect(process.env.MONGO_URI, {...})
+}
+...
+```
+
+#### Writing tests for our routes
+
+```ts
+import request from 'supertest';
+import {app} from '../../app';
+
+it('has a route handler listening to /api/tickets for post requests', async ()=>{
+  const respose = await request(app).post('api/tickets').send({})
+
+  expect(response.status).not.toEqual(404)
+})
+```
+- We can also do this for all routes first before we implement them
+
+To test routes and look for authentication we first wire up some of the middelwares from our `auth` service so that we get the correct status code for errors (`401`)
+
+To test that we are signed in, we can't use the `global.signin` we did before because there is no route in our **ticketing service** that requires us to pass a body
+
+We will set cookies for testing manually:
+
+```ts
+import jwt from 'jsonwebtoken';
+
+declare global{
+  namespace NodeJS {
+    interface Global {
+      signin(): string[];
+    }
+  }
+}
+global.signin = () =>{
+  //Build a jwt
+  const payload = {
+    id: 'asfeaf',
+    email: 'test@test.com'
+  }
+
+  //create the JWT
+  const token = jwt.sign(payload, process.env.JWT_KEY!)
+
+  //build session Object
+  const session = {jwt: token};
+
+  //turn that session into JSONc
+  const sessionJSON = JSON.stringify(session)
+
+  //take JSON and sncode it as base64
+  const base64 = Buffer.from(sessionJSON).toStrin('base64')
+
+  //return string thats the cookie with the encoded data
+
+  return [`express:sess=${base64}`]
+}
+
+```
+- You can see `express:sess=${base64}` in inspect element when we make a request with our `auth` service
+- we use the type `string[]` because of `supertest` library
+
+Now we can use this in our test
+```ts
+it(`returns a status other than 401 if the user is gigned in`, async()=>{
+  const respose = await request(app)
+    .post('api/tickets/')
+    .set('Cookie', global.signin())
+    .send({})
+  
+  expect(response.status).not.toEqual(401);
+})
+```
+
+#### Ticket Mongoose Model
+
+<a href="https://ibb.co/q7MNspk"><img src="https://i.ibb.co/S5XtnBR/image.png" alt="image" border="0"></a>
+
+
+#### Testing Document Creations
+
+```ts
+import {Ticket} from '/models/ticket';
+
+it('creates a ticket with valid inputs', async ()=>{
+  let tickets = await Ticket.find({})
+  expect(tickets.length).toEqual(0)
+  //we wrote a beforeEach earlier that empties the memory mongo db
+
+  await request(app)
+    .post('/api/tickets')
+    .set('Cookie', global.signin())
+    .send({
+      title: 'abc',
+      price: 20
+    })
+    .expect(201);
+
+  tickets = await Ticket.find({})
+  expect(tickets.length).toEqual(1);
+  expect(tickets[0].price).toEqual(20);
+})
+```
+
+#### Testing getting a ticket
+
+Getting a ticket
+```ts
+router.get('/api/tickets/:id', async(req:Request, res:Response)=>{
+  const ticket = await Ticket.findById(req.params.id);
+
+  if(!ticket){
+    //throw error
+  }
+
+  res.send(ticket)
+})
+```
+
+Test:
+```ts
+import mongoose from 'mongoose';
+
+it('returns a 404 fi the ticket is not found', async () =>{
+  const id = new mongoose.Typs.ObjectId().toHexString();
+
+  const res = await request(app)
+    .get(`/api/tickets/${id}`)
+    .send()
+    .expect(404)
+})
+```
+- We need to generate an id or else `mongo` will throw a different error
+
+#### Updating a ticket
+
+To test an error when the user does not own a ticket, we need to update our `global.signin()` method to generate a new id whenever it is called:
+```ts
+global.signin = () =>{
+const payload ={
+  id: new mongoose.Types.ObjectId().toHexString,
+  email: 'test@test.com',
+}
+...
+}
+```
+
+## NATS Streaming Server - An Event Bus Implementation
+
+<a href="https://ibb.co/7bQTrpV"><img src="https://i.ibb.co/BwG7T6j/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/Z83g4bK"><img src="https://i.ibb.co/tsS2j1c/image.png" alt="image" border="0"></a>
+
+
+#### Creating a NATS Streaming Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deplyment
+metadata:
+  name: nats-depl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nats
+  template:
+    metadata:
+      labels:
+        app: nats
+    spec:
+      containers:
+        - name: nats
+          image: nats-streaming:0.17.0
+          args: [
+            '-p',
+            '4222',
+            '-m',
+            '8222',
+            '-hbi',
+            '5s',
+            '-hbt',
+            '5s',
+            '-hbf',
+            '2',
+            '-SD',
+            '-cid',
+            'ticketing'
+          ]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  selector:
+    app: nats
+  ports:
+    - name: client
+      protocol: TCP
+      port: 4222
+      targetPort: 4222
+    - name: monitoring
+      protocol: TCP
+      port: 8222
+      targetProt: 8222
+```
+- Documentation and other commands for nats-streaming found here: [nats-streaming](https://hub.docker.com/_/nats-streaming)
+
+#### Big Notes on NATS Streaming
+
+<a href="https://ibb.co/x5V48Hw"><img src="https://i.ibb.co/Bs81KNv/image.png" alt="image" border="0"></a><br />
+
+<a href="https://ibb.co/hFn27KH"><img src="https://i.ibb.co/b5yNWrL/image.png" alt="image" border="0"></a><br />
+
+<a href="https://ibb.co/q1GDZcz"><img src="https://i.ibb.co/DKX1qvN/image.png" alt="image" border="0"></a><br />
+
+#### Building a NATS Test Project
+
+<a href="https://ibb.co/b2FY3K3"><img src="https://i.ibb.co/WP07323/image.png" alt="image" border="0"></a>
+
+After creating a project with `npm init -y` and `tsc --init` we need to install a couple of dependicies
+
+```bash
+npm install node-nats-streaming ts-node-dev typescript @types/node
+```
+
+Setup our files as such:
+- src
+  - listener.ts
+  - publisher.ts
+
+Add some scripts in `package.json`
+
+```json
+{
+  "scripts":{
+    "publish" : "ts-node-dev --rs --notify false src/publisher.ts",
+    "listen" : "ts-node-dev --rs --notifyh false src/listener.ts"
+  }
+}
+```
+- We can use the command `rs` to restart the `ts-node-dev` instance
+
+We are going to setup **port forwarding** for this dummy project
+<a href="https://ibb.co/pdDxz0H"><img src="https://i.ibb.co/HqvVzFc/image.png" alt="image" border="0"></a>
+
+```bash
+kubectl port-forward name-of-pode 4222:4222
+```
+- get pods with `kubectl get pods`
+
+<a href="https://ibb.co/p21fwpw"><img src="https://i.ibb.co/WnHk515/image.png" alt="image" border="0"></a><br />
+- `ticket:created` is the channel, name of the channel is called the **subject**
+- `subscription` listens for the channel type and the data
+
+
+In `publisher.ts`
+```ts
+import nats from 'node-nats-streaming';
+
+console.clear()
+//stan is really  client
+const stan = nats.connect('ticketing', 'abc', {
+  url: 'http://localhost:4222'
+});
+
+stan.on('connect', () => {
+  console.log('Publisher connected to NATS')
+
+  const data = JSON.stringify({
+    id: '123',
+    title: 'cencert',
+    price: 20
+  });
+
+  stan.publish('ticket:created', data, ()=>{
+    console.log('Event published')
+  })
+})
+```
+- In documentation, you will see `client` as `stan`, `stan` is `nats` backwards
+- With `NATS` we can only share raw data strings, so we have to convert it to **JSON**
+- `abc` is the clientID (more on this later)
+
+In `listener.ts`
+
+```ts
+import nats, {Message} from 'node-nats-streaming';
+
+console.clear()
+
+const stan = nats.connect('ticketing', '123', {
+  url: 'http://localhost:4222'
+})
+
+stan.on('connect', () =>{
+  console.log('Listener connected to NATS')
+
+  const substriction = stan.subscribe('ticket:created');
+
+  substriction.on('message', (msg: Message) => {
+    const data = msg.getData();
+
+    if(typeof data === 'string') {
+      console.log(`Received event #${msg.getSequence()}, with data:${JSON.parse(data)}`)
+    }
+  })
+})
+```
+- `123` is the clientID (more on this later)
+
+
+#### Client ID Generation
+
+If we tried to start another instance of `listener.ts`, We would get the error: **Error: Client ID already registered**
+
+<a href="https://ibb.co/LN6Lpjj"><img src="https://i.ibb.co/GHkKPYY/image.png" alt="image" border="0"></a>
+
+Usually we can take care of this easily in Kubernetes, but for this case we would generate a random id
+
+Currently, if we were to generate 2 instances of `listener.ts`, they would both console log when we emit one event
+
+If we emit an event, it should only go to one of them
+
+We can solve this in  `node-nats-streaming` with **Queue Groups**
+
+<a href="https://ibb.co/r67vG8S"><img src="https://i.ibb.co/fp1QY65/image.png" alt="image" border="0"></a><br />
+
+Back in `listener.ts`
+
+```ts
+stan.on('connect', ()=>{
+  ...
+  const subscription = stan.subscribe('ticket:created', 'queue-group-name')
+})
+```
+
+#### More Subscribe Options
+
+By default, if an event results in an error, NATS will throw it out. We can set options to avoid this
+
+```ts
+stan.on('connect', ()=>{
+  ...
+  const options = stan
+    .subscriptionOptions()
+    .setManualAckMode(true);
+  const subscription = stan.subscribe('ticket:created', 'queue-group-name')
+})
+```
+- `Ack` is acknowledgement
+- We need to manully acknowledge this event. Right now, the event will try to send the event again after a 30 seconds because it thinks it failed
+
+To Acknowledge:
+```ts
+subscription.on('message', (msg: Message) => {
+  ...
+  msg.ack();
+})
+```
+
+#### Client Health Checks
+
+In our NATS deployment service we added:
+```yaml
+ - name: monitoring
+    protocol: TCP
+    port: 8222
+    targetProt: 8222
+```
+
+Let's forward this port aswell
+
+```bash
+kubectl port-forward pod-name 8222:8222
+```
+
+Now if we go in our browser to `localhost:8222/streaming` in our browser, we should see:
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/7vy0QSL/image.png" alt="image" border="0"></a>
+
+If we type in `localhost:8222/streaming/channelsz?subs=1`, We can see a list of our subscriptions
+
+When we restart one of our subscriptions with `rs`, we will temporarily see 3 subscriptions instead of 2
+
+NATS thinks it may have just disconnected temporarily, but we don't want this behaviour
+
+Inside `listener.ts`
+```ts
+sta.on('connect', ()=>{
+  ...
+  stan.on('close', ()=>{
+    process.exit()
+  })
+})
+...
+process.on('SIGINT', () => stan.close())
+process.on('SIGTERM', () => stan.close())
+```
+- `SIGINT` and `SIGTERM` are termination signals
+
+#### Core Concurrency Issues
+
+<a href="https://ibb.co/QFhqzJ9"><img src="https://i.ibb.co/pvNsG12/image.png" alt="image" border="0"></a>
+
+There are infinant number of ways this system can fail: 
+- Listener fails to process the event
+- One listener runs more quickly than another
+- NATS might think a client is still alive when it is dead
+- We might recieve/process the same event more than once if one is still processing
+
+Common questions
+<a href="https://ibb.co/0J02NXp"><img src="https://i.ibb.co/mznTsBr/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/CJztxgf"><img src="https://i.ibb.co/4s7fBzH/image.png" alt="image" border="0"></a>
+
+#### Solving Concurrency Issues
+
+<a href="https://ibb.co/0hWLkXd"><img src="https://i.ibb.co/f4KWbSP/image.png" alt="image" border="0"></a>
+<br/>
+<a href="https://ibb.co/2vD7Xrp"><img src="https://i.ibb.co/K2MjCg8/image.png" alt="image" border="0"></a>
+<br/>
+<a href="https://ibb.co/v3dTBKG"><img src="https://i.ibb.co/k4DwyWf/image.png" alt="image" border="0"></a>
+<br />
+<a href="https://ibb.co/2NP1R0V"><img src="https://i.ibb.co/PQ4vJsX/image.png" alt="image" border="0"></a>
+<br />
+<a href="https://ibb.co/5vPTpBT"><img src="https://i.ibb.co/d6RBCGB/image.png" alt="image" border="0"></a>
+<br/>
+<a href="https://ibb.co/gPGwpSh"><img src="https://i.ibb.co/hZkHjBw/image.png" alt="image" border="0"></a>
+- We can use `number` to make sure that transactions are done in order
+
+#### Event Redelivery
+
+<a href="https://ibb.co/6nQHXCC"><img src="https://i.ibb.co/0D5Csbb/image.png" alt="image" border="0"></a>
+
+Back in `listener.ts`
+```ts
+const options = stan
+  .subscriptionOptions()
+  .setManualAckMode(true)
+  .setDeliverAllAvailable()
+  .setDurableName('nname')
+```
+- we ideally don't use `setDeliverAllAvailable` on its own because it will get all the events ever created
+- but this will run when the service is first deployed,
+
+<a href="https://ibb.co/kcGp8gD"><img src="https://i.ibb.co/VBLdSWC/image.png" alt="image" border="0"></a>
+
+We need need to make sure our subscript has a queu-group-name otherwise the durable subscription will not persist (be dumped once our service goes down)
+
+```ts
+...
+const subscription = stan.subscribe(
+  'ticket:created',
+  'queue-group-name',
+  options
+)
+```
+
+#### NATS listeners as a class
+
+<a href="https://ibb.co/JsSrtVP"><img src="https://i.ibb.co/qr2mjKw/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/bF1x3PB"><img src="https://i.ibb.co/vh1bBHP/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/Kyh215c"><img src="https://i.ibb.co/SvytL6D/image.png" alt="image" border="0"></a>
+
+```ts
+import { Stan } from 'node-nats-streaming';
+
+abstract class Listener{
+  abstract subject: string;
+  abstract queueGroupName: string;
+  abstract onMessage(data: any, msg: Message): void;
+  private client: Stan;
+  protected ackWait = 5 * 1000;
+
+  constructor(client: Stan){
+    this.client = client;
+  }
+
+  subsctiptionOptions(){
+    return this.client
+      .subscriptionOptions()
+      .setDeliverAllAvailable()
+      .setManualAckMode(true)
+      .setAckWait(this.ackWait)
+      .setDurableName(this.queueGroupName)
+  }
+
+  listen() {
+    const subscription = this.client.subscribe(
+      this.subject,
+      this.queueGroupName,
+      this.subscriptionOptions()
+    );
+
+    subscription.on('message', (msg: Message) => {
+      console.log(
+        `Message received: ${this.subject} / ${this.queueGroupName}`
+      )
+
+      const parsedData = this.parseMessage(msg);
+      this.onMessage(parsedData, msg)
+    })
+  }
+
+  parseMessage(msg: Message) {
+    const data = msg.getData();
+    return typeof data === 'string'
+      ? JSON.parse(data)
+      : JSON.parse(data.toString('utf8'))
+  }
+}
+```
+
+#### Extending the Listener
+
+Let's create the Class **TicketCreatedListener**
+
+```ts
+class TicketCreatedListener extends Listener {
+  subject = 'ticket:created';
+  queueGroupName = 'payments-service';
+  onMessage(data: any, msg: Message){
+    console.log('Event data!', data);
+
+    msg.ack();
+  }
+}
+```
+
+Now we can use this
+
+```ts
+stan.on('connect', ()=>{
+  console.log('listener connectd to NATS');
+
+  stan.on('close', ()=>{
+    console.log('NATS connection closed');
+    process.exit();
+  })
+
+  new TicketCreatedListener(stan).listen();
+})
+
+```

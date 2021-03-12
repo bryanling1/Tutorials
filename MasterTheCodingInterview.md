@@ -8,6 +8,8 @@
   - [Reversing a linked list](#reversing-a-linked-list)
   - [M to N reversal](#m-to-n-reversal)
   - [Flattening doubly linked list with children](#flattening-doubly-linked-list-with-children)
+      - [Cycle Detection](#cycle-detection)
+        - [Floyd's Tortoise and Hare Algorithm](#floyds-tortoise-and-hare-algorithm)
 # Palindromes
 
 - Often appear as string sub problems
@@ -139,3 +141,16 @@ while (currentNode !== null){
 }
 }
 ```
+
+#### Cycle Detection 
+
+<a href="https://ibb.co/7CNPwD4"><img src="https://i.ibb.co/Rb4fxKy/image.png" alt="image" border="0"></a>
+
+##### Floyd's Tortoise and Hare Algorithm
+- 2 pointers (tortoise and hare)
+- **tortoise** moves at 1 step per iteration
+- **hair** moves at 2 steps per iteration
+- You have detected a cycle when the 2 pointers end up at the same node
+- If **hair** is null  or **hair.next** is null, you do not have a cycle (found the tail)
+
+<a href="https://ibb.co/4t9yWgw"><img src="https://i.ibb.co/c3M5JXK/image.png" alt="image" border="0"></a>
