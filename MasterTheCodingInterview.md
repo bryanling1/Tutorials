@@ -8,9 +8,11 @@
   - [Reversing a linked list](#reversing-a-linked-list)
   - [M to N reversal](#m-to-n-reversal)
   - [Flattening doubly linked list with children](#flattening-doubly-linked-list-with-children)
-      - [Cycle Detection](#cycle-detection)
+  - [Cycle Detection](#cycle-detection)
         - [Floyd's Tortoise and Hare Algorithm](#floyds-tortoise-and-hare-algorithm)
-      - [Minimum Brackets to Remove](#minimum-brackets-to-remove)
+- [Stacks and Queues](#stacks-and-queues)
+  - [Minimum Brackets to Remove](#minimum-brackets-to-remove)
+  - [Implement a Queue class using stacks](#implement-a-queue-class-using-stacks)
 # Palindromes
 
 - Often appear as string sub problems
@@ -143,7 +145,7 @@ while (currentNode !== null){
 }
 ```
 
-#### Cycle Detection 
+## Cycle Detection 
 
 <a href="https://ibb.co/7CNPwD4"><img src="https://i.ibb.co/Rb4fxKy/image.png" alt="image" border="0"></a>
 
@@ -155,8 +157,8 @@ while (currentNode !== null){
 - If **hair** is null  or **hair.next** is null, you do not have a cycle (found the tail)
 
 <a href="https://ibb.co/4t9yWgw"><img src="https://i.ibb.co/c3M5JXK/image.png" alt="image" border="0"></a>
-
-#### Minimum Brackets to Remove
+# Stacks and Queues
+## Minimum Brackets to Remove
 
 ```ts
  var minRemoveToMakeValid = function(s) {
@@ -189,3 +191,44 @@ while (currentNode !== null){
 };
 ```
 - set `.split()` elements to `''` will remove them when we `.join()`
+
+## Implement a Queue class using stacks
+
+<a href="https://ibb.co/GPDbMPC"><img src="https://i.ibb.co/h8Ntd82/image.png" alt="image" border="0"></a>
+ - Continue popping out of `stack2` until it is empty, push `stack` into `stack2` and continue to pop
+
+```js
+class QueueWithStack{
+  constructor(){
+    this.in=[];
+    this.out=[];
+  }
+
+  enqueue(val){
+    this.in.push(val)
+  }
+
+  dequeue(){
+    if(this.out.length === 0){
+      while(this.in.length){
+        this.out.push(this.in.pop())
+      }
+    }
+    return this.out.pop()
+  }
+
+  peek(){
+    if(this.out.length === 0){
+      while(this.in.length){
+        this.out.push(this.in.pop())
+      }
+    }
+    return this.out[this.out.length - 1]
+  }
+
+  empty(){
+    if(this.out.length === 0 && this.int.length === 0) return true
+    return false
+  }
+}
+```

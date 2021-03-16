@@ -89,6 +89,8 @@
       - [Publishing Ticket Creation Event](#publishing-ticket-creation-event)
       - [Adding NATS client to our ticketing service](#adding-nats-client-to-our-ticketing-service)
       - [Creating NatsWrapper Class](#creating-natswrapper-class)
+      - [Graceful shutdown](#graceful-shutdown)
+      - [Failed Event Publishing](#failed-event-publishing)
 
 <a id="auth"></a>
 
@@ -2312,6 +2314,14 @@ export const natsWrapper = new NatsWrapper();
 class NatsWrapper{
   private _client?: Stan;
 
+  get client(){
+    if(!this._client){
+      throw new Error('Cannot access NATS client before connecting')
+    }
+
+    return this._client;
+  }
+
   connect(clusterId: string, clientId: string, url: string){
     this._client = nats.connect(clusterId, clientId, {url});
 
@@ -2328,6 +2338,8 @@ class NatsWrapper{
     
   }
 }
+
+export const natsWrapper = new NatsWrapper();
 ```
 
 Now we can use this similar to `mongoose.connect`
@@ -2342,3 +2354,54 @@ try{
 ```
 -`http://nats_srv:4222` comes from our kubernetes pod
 - ticketing is the id we specified in `.yaml` file
+
+And we can add it in `routes/new.ts`
+```ts
+  import { natsWrapper } from '../nats-wrapper';
+
+  ...
+  await new TicketCreatedPublisher(natsWrapper.client)...
+```
+
+#### Graceful shutdown
+
+Inside `index.ts`
+```ts
+...
+try{
+  await natsWrapper.connect('ticketing', 'alsdkj', 'http://nats-srv:4222');
+  natsWrapper.client.on('close', () => {
+    console.log('NATS connection closed!');
+    process.exit();
+  });
+  process.on('SIGINT', () => natsWrapper.client.close())
+  process.on('SIGTERM', () => natsWrapper.client.close())
+}
+/..
+```
+- We don't want to do this in our `NatsWrapper` class because it is bad design to have `process.exit()` defined in our shared classes
+- We should now restart `skaffold`
+
+#### Failed Event Publishing
+
+<a href="https://ibb.co/2j1JLQc"><img src="https://i.ibb.co/P5vkbn1/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/9spyBjH"><img src="https://i.ibb.co/jg83qFk/image.png" alt="image" border="0"></a>
+
+Turns out `await` isn't relevant to the issue with our current implmentation with our `publishers`
+
+<a href="https://ibb.co/kQfMnRB"><img src="https://i.ibb.co/vZGD57q/image.png" alt="image" border="0"></a>
+
+- If our `transaction event` fails, then the `Transaction Database` and `Accounts Database` would be out of sync
+
+To prevent this, we should **save the event into our database** and include a "sent flag"
+<a href="https://ibb.co/MGxwLJ0"><img src="https://i.ibb.co/Sd4YpZC/image.png" alt="image" border="0"></a>
+
+We need to also make sure that saving a `Transaction` and `Event` both succeed
+
+<a href="https://ibb.co/5973Jr5"><img src="https://i.ibb.co/qnZ82NR/image.png" alt="image" border="0"></a>
+
+MongoDB has a built in function called a `database transaction`. Basically says **Do these actions, and if any of them fail, reverse any actions**
+
+We won't do this for this course
+
