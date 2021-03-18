@@ -13,6 +13,7 @@
 - [Stacks and Queues](#stacks-and-queues)
   - [Minimum Brackets to Remove](#minimum-brackets-to-remove)
   - [Implement a Queue class using stacks](#implement-a-queue-class-using-stacks)
+- [Recursion](#recursion)
 # Palindromes
 
 - Often appear as string sub problems
@@ -232,3 +233,11 @@ class QueueWithStack{
   }
 }
 ```
+
+# Recursion
+- Normal recursion space: O(N)
+- Tail recursion space: O(1)
+
+<a href="https://ibb.co/Xj6dTyP"><img src="https://i.ibb.co/S5H1pQg/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/svcvxJ8"><img src="https://i.ibb.co/mCdCZFf/image.png" alt="image" border="0"></a>
