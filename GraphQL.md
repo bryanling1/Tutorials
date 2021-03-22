@@ -21,7 +21,7 @@
   - [17. Combining Query and Mutation to a Component](#17-combining-query-and-mutation-to-a-component)
   - [18. Passing Query Variables](#18-passing-query-variables)
   - [19. Apollo Store Caching/Normalizing with dataIdFromObject](#19-apollo-store-cachingnormalizing-with-dataidfromobject)
-  - [19. Optimistic Responses](#19-optimistic-responses)
+  - [20. Optimistic Responses](#19-optimistic-responses)
 
 <a id="1"></a>
 ## 1. REST-ful
@@ -508,7 +508,7 @@ const client = new ApolloClient({
 ```
 - Now evertime we return an id from a mutation, Apollo will know to rerender
 
-## 19. Optimistic Responses
+## 20. Optimistic Responses
 
 <a href="https://imgbb.com/"><img src="https://i.ibb.co/qRQvNqx/image.png" alt="image" border="0"></a>
 
@@ -528,3 +528,88 @@ const onLike = (id, likes) =>{
 }
 ```
 - `likeLyric` is the type of data
+  
+## Authentication Project from Scratch
+
+[Starter](https://github.com/StephenGrider/auth-graphql-starter)
+<a href="https://ibb.co/3kBCjzs"><img src="https://i.ibb.co/d7G5Vgc/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/jgDccCf"><img src="https://i.ibb.co/RzcxxXb/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/THPCDQJ"><img src="https://i.ibb.co/JzrhWY8/image.png" alt="image" border="0"></a>
+
+#### The User Type
+
+Inside `server/schema/types/user_type.js`
+```ts
+const { graphql } = require('graphql');
+const {
+  GraphQLObjectType,
+  GraphQLStringType,
+}
+
+const Usertype = new GraphQLObjectType({
+  name: "UserType",
+  fields: {
+    email: { type: GraphQLString }
+  }
+})
+
+module.exports = Usertpe;
+```
+
+#### Signup Mutation
+
+We want to put all the "business logic" for resolves in a seperate file. This will clean up our mutations
+
+<a href="https://ibb.co/TBF478r"><img src="https://i.ibb.co/XZv7KsV/image.png" alt="image" border="0"></a>
+
+Inside `server/schema/mutations.js`
+
+```ts
+const { graphql } = require('graphql');
+const {
+  GraphQLObjectType,
+  GraphQLStringType,
+}
+const UserType = require('./types/user_type');
+const AuthService = require('../services/auth');
+
+const mutation = new GraphQLObjectType({
+  name: 'Mutation',
+  fields: {
+    signup: {
+      type: UserType,
+      args: {
+        email: { type: GraphQLString },
+        password: { type: GraphQLString }
+      },
+      resolve(parenValue, {email, password}, req) {
+        return AuthService.signup({email, password, req })
+      }
+    }
+  }
+});
+
+module.exports = mutation;
+```
+  - `request` is the request object from **express**
+  - Since `AuthService` returns a promise, we need to make sure we `return`
+
+Now we can test out this query in GraphiQL
+
+Before we do that however, we need to pass a fummyField to our rootQuery temporarily, otherwise GraphQL will throw an error
+
+Inside `server/schema/types/root_query_type.js`
+
+```js
+...
+const RootQueryType = new GraphQLObjectType({
+  name: 'RootQueryType',
+  fields: {
+    dummyField: { type: GraphQLID }
+  }
+});
+...
+```
+
