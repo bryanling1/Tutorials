@@ -10,6 +10,7 @@
   - [Table of Contents](#table-of-contents)
   - [First Project Users](#first-project-users)
       - [Init](#init)
+      - [Setup tests](#setup-tests)
 
 <a href="https://ibb.co/52SRssK"><img src="https://i.ibb.co/fQyxrrD/image.png" alt="image" border="0"></a>
 
@@ -28,6 +29,27 @@ npm init -y
 npm install mongoose nodemon mocha
 ```
 
+#### Setup tests
 
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/XbWcfgx/image.png" alt="image" border="0"></a>
+
+
+Inside `test/test_helper.js`
+
+```js
+const mongoose = require('mongoose');
+
+mongoose.connect('mongodb://localhost/users_test');
+
+mongoose.connection.once('open', () => {
+
+    console.log('Good to go!');
+
+}).on('error', () => {
+
+    console.warn('Warning', error);
+
+})
+```
 
 
