@@ -91,6 +91,9 @@
       - [Creating NatsWrapper Class](#creating-natswrapper-class)
       - [Graceful shutdown](#graceful-shutdown)
       - [Failed Event Publishing](#failed-event-publishing)
+      - [Fixing our tests](#fixing-our-tests)
+      - [Ensuring Mock Invocations](#ensuring-mock-invocations)
+      - [Nats Evn Variables](#nats-evn-variables)
 
 <a id="auth"></a>
 
@@ -847,7 +850,7 @@ beforeAll(async()=>{
   mongo = new MongoMemoryServer();
   const mongoUri = await mongo.getUri();
 
-  await.mongoose.connect(mongoUri, {
+  await mongoose.connect(mongoUri, {
     useNewUrlParser: true,
     useUnifiedTopology: true
   })
@@ -2405,3 +2408,118 @@ MongoDB has a built in function called a `database transaction`. Basically says 
 
 We won't do this for this course
 
+#### Fixing our tests
+
+Most of the tests we wrote before should be throwing errors related to `NATS`
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/4ZPgVCP/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/Cb6BGWq"><img src="https://i.ibb.co/ZBSdDN3/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/bLj1kd3"><img src="https://i.ibb.co/CvpBf0t/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/bbH9s8X"><img src="https://i.ibb.co/nP3J75j/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/DKCmRwH"><img src="https://i.ibb.co/x5jw7zt/image.png" alt="image" border="0"></a>
+- New Ticket Route only cares about the `client` property in our `NatsWrapper`
+Inside `src/__mocks__/nats-wrapper.ts`
+
+<a href="https://ibb.co/HzZZBvj"><img src="https://i.ibb.co/J7ZZmL9/image.png" alt="image" border="0"></a>
+
+```ts
+export const natsWrapper = {
+  client: {
+    publish: (subject: string, data: string, callback: () => void) => {
+      callback()
+    }
+  }
+};
+```
+
+To tell jest, inside `src/routes/test/setup.ts`
+
+```ts
+jest.mock('../../nats-wrapper');
+```
+
+#### Ensuring Mock Invocations
+
+Let's update our mock `natsWrapper`
+```ts
+export const natsWrapper = {
+  client: {
+    publish: jest.fn().mockImplementation((subject: string, data: string callback: () => void ) = >{
+      callback()
+    })
+  }
+};
+```
+
+Now in `src/routes/__test__new.test.ts`
+
+```ts
+import { natsWrapper } from '../nats-wrapper';
+it('publishes an event', async () => {
+  const title = 'asfef'
+
+  await request(app)
+    .post('/api/tickets')
+    .set('Cookie', global.signin())
+    .send({
+      title,
+      price: 20,
+    })
+    .expect(201);
+  
+  expect(natsWrapper.client.publish).toHaveBeenCalled()
+})
+```
+- Since we added `natsWrapper` as a mock in `test/setup.js`, we can just import our default `natsWrapper` and it will use the mock one
+
+We want to make sure that `publish: jest.fn().mockImplementation...` is only called once per test, so back in `setup/test.js`
+
+```ts
+beforeEach(async() => {
+  jest.clearAllMocks();
+  ...
+})
+```
+
+#### Nats Evn Variables
+
+In index.ts we did `natsWrapper.connect(...)` with a hard coded **clusterId, clientId, and url** in our nats server
+
+If we tern these into Evn files, it will be much easier to update inside a config file than the source code
+
+In `tickets-depl.yaml`
+
+```yaml
+...
+    spec:
+      containers:
+        - name: tickets
+          image: bryanling/tickets
+          env:
+            - name: NATS_CLIENT_ID
+              valueFrom: 
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NATS_URL
+              value: 'http://nats-srv:4222'
+            - name: NATS_CLUSTER_ID
+              value: 'ticketing'
+
+```
+- We don't do this for the `NATS_CLIENT_ID` because we may have multiple clients
+- We can use the kubernetes **pod id** as the `NATS_CLIENT_ID`
+
+Now inside `index.ts`, we should check to make sure these environment variables are initialized
+
+```ts
+if(!process.env.NATS_URL){
+  throw new Error('NATS_URL must be defined')
+}
+...
+```
+
+And now we can apply `process.env.NATS_...` to `natsWrapper.connect()`
