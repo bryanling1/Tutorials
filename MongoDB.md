@@ -42,7 +42,11 @@
       - [Handling Text Search](#handling-text-search)
       - [Updating Multiple](#updating-multiple)
       - [Fixing the results count](#fixing-the-results-count)
-  - [MongoDB and Express](#mongodb-and-express)
+  - [MongoDB and Express: Uber Driver App](#mongodb-and-express-uber-driver-app)
+      - [Working with Moch and Express](#working-with-moch-and-express)
+      - [Refactoring for Controllers and Models](#refactoring-for-controllers-and-models)
+      - [Why we Express needs a bodyParser](#why-we-express-needs-a-bodyparser)
+      - [Testing Driver Creation](#testing-driver-creation)
 
 <a href="https://ibb.co/52SRssK"><img src="https://i.ibb.co/fQyxrrD/image.png" alt="image" border="0"></a>
 
@@ -212,7 +216,7 @@ Inside `package.json`
 
 ```json
 "scripts":{
-  "test": "nodemon --exec 'mocha -R min'"
+  "test": "nodemon --exec 'mocha --recursive -R min'"
 }
 ```
 - `mocha --watch` sometimes has problems with mongoose, so we will use `nodemon` which restarts from the stary every time a change is found
@@ -943,5 +947,78 @@ module.exports = (criteria, sortProperty, offset=0, limit=20) =>{
 - We will replace `Artist.count()` with `Artist.find(buildQuery(criteria)).count()`
 - At the time of this course, we have to make 2 queries and there is no work around
 
-## MongoDB and Express
+## MongoDB and Express: Uber Driver App
 
+<a href="https://ibb.co/x8SrRGw"><img src="https://i.ibb.co/Nn6GHpf/image.png" alt="image" border="0"></a>
+
+#### Working with Moch and Express
+
+We can make fake http requests with `supertest`
+
+```
+npm install supertest
+```
+
+Inside `test/app_test.js`
+
+```js
+const assert = require('assert')
+const request = require('supertest')
+const app = require('../app');
+
+describe('The express app', () => {
+    it('handles a GET request to /api', (done) => {
+        request(app)
+            .get('/api')
+            .end((err, response)=>{
+                assert(response.body.hi === 'some string');
+                done();
+            })
+    })
+})
+```
+
+#### Refactoring for Controllers and Models
+
+Inside `routes/routes.js`
+
+```js
+const DriversController = require('../controllers/drivers_controller');
+
+app.get('/api', DriversController.greeting)
+```
+
+Inside `controllers/drivers_dontroller`
+
+```js
+module.exports = {
+    greeting(req, res) {
+        res.send({hi: 'there'})
+    }
+}
+```
+
+#### Why we Express needs a bodyParser
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/PTkc9Ng/image.png" alt="image" border="0"></a>
+
+#### Testing Driver Creation
+
+Inside `test/controllers/drivers_controller_test.js`
+
+```js
+const assert = require('assert');
+const request = require('supertest');
+const app = require('../../app');
+
+describe('Drivers controller', () => {
+    it('Creates a new driver', (done) => {
+        request(app)
+            .post('/api/drivers')
+            .send({ email: 'test@test.com' })
+            .end(()=>{
+                done();
+            })
+    })
+})
+```
