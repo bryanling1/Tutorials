@@ -535,7 +535,7 @@ We're going to create a class the handles passwords
 import {scrypt, randomBytes} from 'crypto';
 import {promisify} from 'util'
 
-const scryptAsync  = promsifu(scrypt);
+const scryptAsync  = promisify(scrypt);
 
 export class Password{
   static async toHash(password:string){

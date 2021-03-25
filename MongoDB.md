@@ -55,6 +55,8 @@
       - [Testing GeoNear Query](#testing-geonear-query)
       - [Gotcha 1: Indexes in a Test Environment](#gotcha-1-indexes-in-a-test-environment)
       - [Gotcha 2:](#gotcha-2)
+  - [Mongoose and Typescript](#mongoose-and-typescript)
+      - [Schema and Documents](#schema-and-documents)
 
 <a href="https://ibb.co/52SRssK"><img src="https://i.ibb.co/fQyxrrD/image.png" alt="image" border="0"></a>
 
@@ -1243,7 +1245,27 @@ This is because when we pull out numbers in the query string with `get`, express
 {... coordinates: [parseFloat(lng), parseFloat(lat)]}
 ```
 
+## Mongoose and Typescript
 
+#### Schema and Documents
+
+```ts
+import mongoose, { Schema, Document } from 'mongoose';
+
+export interface IUser extends Document {
+  email: string;
+  firstName: string;
+  lastName: string;
+}
+
+const UserSchema: Schema = new Schema({
+  email: { type: String, required: true, unique: true },
+  ...
+});
+
+// Export the model and return your IUser interface
+export default mongoose.model<IUser>('User', UserSchema);
+```
 
 
 
