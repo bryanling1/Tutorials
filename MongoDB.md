@@ -47,6 +47,14 @@
       - [Refactoring for Controllers and Models](#refactoring-for-controllers-and-models)
       - [Why we Express needs a bodyParser](#why-we-express-needs-a-bodyparser)
       - [Testing Driver Creation](#testing-driver-creation)
+      - [Seperate Test Databases](#seperate-test-databases)
+      - [Handling Errors with Middleware in Express](#handling-errors-with-middleware-in-express)
+      - [Handling Editing Drivers](#handling-editing-drivers)
+      - [Geo Locations in MongoDB](#geo-locations-in-mongodb)
+      - [GeoNear Queries](#geonear-queries)
+      - [Testing GeoNear Query](#testing-geonear-query)
+      - [Gotcha 1: Indexes in a Test Environment](#gotcha-1-indexes-in-a-test-environment)
+      - [Gotcha 2:](#gotcha-2)
 
 <a href="https://ibb.co/52SRssK"><img src="https://i.ibb.co/fQyxrrD/image.png" alt="image" border="0"></a>
 
@@ -1010,15 +1018,232 @@ Inside `test/controllers/drivers_controller_test.js`
 const assert = require('assert');
 const request = require('supertest');
 const app = require('../../app');
+const mongoose = require('mongoose');
+
+const Driver = mongoose.model('driver');
 
 describe('Drivers controller', () => {
     it('Creates a new driver', (done) => {
+        Driver.count().then(count => {
+            request(app)
+                .post('/api/drivers')
+                .send({ email: 'test@test.com' })
+                .end(()=>{
+                    Driver.count().then(newCount=>{
+                        assert(count + 1 === newCount);
+                        done();
+                    })
+                })
+        })
+        
+    })
+})
+```
+- We want to use `const Driver = mongoose.model('driver');` becuase mongoose, mocha, and express don't always work wll together
+- If we run this, we should gen an error message saying `MongooseError: Schema hasn't been registered for model "driver"`
+
+This is because we have `required` it anywhere into our project
+
+We should require it in our `routes` related to Drivers
+
+#### Seperate Test Databases
+
+We are going to use 2 seperate databases
+
+We will use `process.env.NODE_ENV`
+
+Inside `package.json`
+
+```json
+"scripts":{
+    "test": "NODE_ENG=test nodemon ..."
+}
+```
+
+Now inside `app.js`
+
+```js
+if( process.env.NODE_ENV !== 'test'){
+    mongoose.connect('mongodb://localhost/muber');
+}
+```
+
+Insider `test/test_helper.js`
+
+```js
+const mongoose = require('mongoose');
+
+before(done=>{
+    mongoose.connect('mongodb://localhost/muber_test');
+    mongoose.connection
+        .once('open', ()=>done())
+        .on('error', err =>{
+            console.warn('Waring', err)
+        })
+})
+
+beforeEach(done=>{
+    const {drivers} = mongoose.connection.collections;
+    drivers.drop()
+        .then(()=>done())
+        .catch(()=>done());
+})
+```
+- We want to put this in `test/test_helper.js` so we can use `before` to drouble shoot connection errors when we `require` inside `app.js`
+- We do `.catch(()=>done())` because we are ok if it fails the first time before if the `mongoose.connect` has not been set
+
+#### Handling Errors with Middleware in Express
+
+```js
+app.use((err, req, res, next)=>{
+    ...
+})
+```
+- Any middleware before this one that calls `.catch(next)` will be processed by this middleware
+
+#### Handling Editing Drivers
+
+By convention, we pass the `id` in a `put` requeest url
+
+```js
+app.put('/api/drivers/:id', (req, res, next)=>{
+    const driverId = req.params.id;
+    const driverProps = req.body;
+
+    Drivers.findByIdAndUpdate({_id: driverId}, driverProps);
+        .then(()=> Driver.findById({_id: driverId}))
+        .then(driver=>res.send(driver))
+        .catch(next)
+})
+```
+- `findByIdAndUpdate` does not give you the driver that is updated
+
+Now our test would look like
+
+```js
+const request = require('supertest');
+
+it('PUT to /api/drivers/id edits an existing user', (done)=>{
+    const driver = new Driver({email: 't@t.com', driving: false})
+    driver.save().then(()=>{
         request(app)
-            .post('/api/drivers')
-            .send({ email: 'test@test.com' })
+            .put(`/api/drivers${driver._id}`)
+            .send({driving: true})
             .end(()=>{
-                done();
+                Driver.findOne({email: 't@t.com'}).then(driver=>{
+                    assert(driver.driving === true);
+                    done();
+                })
             })
     })
 })
 ```
+
+#### Geo Locations in MongoDB
+
+Mongo uses `lng` and `lat` ([lng, lat] in that order)
+
+Mongo also has support on whether to calculate the distance on a 2d plane or 2d sphere (earth)
+
+Do define in Schemas, mongoose uses `GeoJSON`
+
+```js
+
+const PointSchema = new Schema({
+    type: {
+        type: String,
+        default: 'Point'
+    },
+    coordinates: {
+        type: Number[],
+        index: '2dsphere',
+    }
+})
+const DriverSchema = new Schema({
+    ...
+    geometry: PointSchema
+})
+```
+
+#### GeoNear Queries
+
+```js
+app.get('/api/drivers', (req, res, next)=>{
+    const {lng, lat} = req.query;
+
+    Driver.geoNear(
+        { type: 'Point', coodrinates: [lng, lat] },
+        { spherical: true, maxDistance: 200000 }
+    )
+})
+```
+- `maxDistance` is in meters
+- `req.query` is `?lng=80&lat=20` as `.get()` cannot have a body
+
+#### Testing GeoNear Query
+
+```js
+it('GET to /api/drivers find drivers in a location', (done) => {
+    const seattleDriver = new Driver({
+        email: 'seattle@test.com', 
+        geometry: {
+            type: 'Point',
+            coordinates: [-122, 48]
+        }
+    })
+
+    const miamiDriver = new Driver({
+        email: 'miami@test.com',
+        geometry: {
+            type: 'Point',
+            coordinate: [-80, 26]
+        }
+    });
+
+    Promise.all(9miamiDriver.save(), seattleDriver.save()])
+        .then(()=>{
+            request(app)
+                .get('/api/drivers?lng=-80&lat=25')
+                .end((err, response)=>{
+                    done()
+                })
+        })
+})
+```
+
+#### Gotcha 1: Indexes in a Test Environment
+
+When we run the test above, an error will say no index for our `geo` data
+
+In our test environment, we are calling `drop()` before every test.
+
+In terms of order of operations, our indexes are dropped and never created again.
+
+To fix this, we can add another step to our `beforeEach`
+
+Inside `test/test_helper`
+```js
+beforeEach((done)=>{
+    const { drivers } = mongoose.connection.collections;
+
+    drivers.drop()
+        .then(()=> drivers.ensureIndex({'geometry.coordinate': '2dsphere'}))
+        .then(()=>done())
+        .then(()=>done())
+})
+```
+
+#### Gotcha 2: 
+
+We should now be getting an error that says `{"error":"\'near\' field must be point"}`
+
+This is because when we pull out numbers in the query string with `get`, express thinks that they are `strings` and not numbers
+
+```js
+{... coordinates: [parseFloat(lng), parseFloat(lat)]}
+```
+
+
+
+
+
