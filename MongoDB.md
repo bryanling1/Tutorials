@@ -57,6 +57,9 @@
       - [Gotcha 2:](#gotcha-2)
   - [Mongoose and Typescript](#mongoose-and-typescript)
       - [Schema and Documents](#schema-and-documents)
+      - [Virtuals and Methods](#virtuals-and-methods)
+      - [Model and static methods](#model-and-static-methods)
+      - [Hooks](#hooks)
 
 <a href="https://ibb.co/52SRssK"><img src="https://i.ibb.co/fQyxrrD/image.png" alt="image" border="0"></a>
 
@@ -1247,6 +1250,8 @@ This is because when we pull out numbers in the query string with `get`, express
 
 ## Mongoose and Typescript
 
+[Source](https://medium.com/@agentwhs/complete-guide-for-typescript-for-mongoose-for-node-js-8cc0a7e470c1)
+
 #### Schema and Documents
 
 ```ts
@@ -1267,5 +1272,131 @@ const UserSchema: Schema = new Schema({
 export default mongoose.model<IUser>('User', UserSchema);
 ```
 
+#### Virtuals and Methods
 
+```ts
+/**
+ *  Not directly exported because 
+    type of `company` field is not deterministic
+ */
+interface UserBaseDocument extends User, Document {
+  friends: Types.Array<string>;
+  creditCards?: Types.Map<string>;
+  fullName: string; // Virtual
+  getGender(): string; // Method
+}
 
+// Export this for strong typing
+export interface UserDocument extends UserBaseDocument {
+  company: Company["_id"];
+}
+
+// Export this for strong typing
+export interface UserPopulatedDocument extends UserBaseDocument {
+  company: Company;
+}
+
+// Virtuals
+UserSchema.virtual("fullName").get(function(this: UserBaseDocument) {
+  return this.firstName + this.lastName
+})
+
+// Methods
+UserSchema.methods.getGender = function(this: UserBaseDocument) {
+  return this.gender > 0 ? "Male" : "Female"
+}
+```
+The nested schema interface **DOES NOT** inherent from Document
+
+```ts
+import { Document, Schema } from "mongoose"
+
+// Subdocument schema
+const UserAddressSchema = Schema(
+  { ... }
+)
+
+// Top-level schema with subdocument embedded
+const UserSchema = Schema({
+  ...
+  address: UserAddressSchema,
+  ...
+})
+
+/** Types **/
+// Interface for subdocument
+// Notice how this interface doesn't inherent from Document
+export interface UserAddress {
+  ...
+}
+
+// Interface for document 
+interface User {
+  ...
+  address: UserAddress;
+  ...
+}
+
+export interface UserBaseDocument extends User, Document {}  
+```
+
+#### Model and static methods
+
+```ts
+// Model type
+export interface UserModel extends Model<UserDocument> {
+  findMyCompany(id: string): Promise<UserPopulatedDocument>
+}
+
+// Static methods
+UserSchema.statics.findWithCompany = async function(
+  this: Model<UserDocument>,
+  id: string
+) {
+  return this.findById(id).populate("company").exec()
+}
+```
+
+We can then export models via 
+
+```ts
+export default model<UserDocument, UserModel>("User", UserSchema)
+```
+
+#### Hooks
+
+For hooks 
+```ts
+function hashPassword = //... your own hash function
+ 
+// Document middlewares
+UserSchema.pre<UserBaseDocument>("save", function(next) {
+  if (this.isModified("password")) {
+    this.password = hashPassword(this.password)
+  }
+});
+// or we can do
+UserSchema.pre("save", function(this: UserBaseDocument, next: Function) {
+  if (this.isModified("password")) {
+    this.password = hashPassword(this.password)
+  }
+});
+```
+- `UserBaseDocument` type is used because we are not sure whtether `save` is called with a plan vs populated user document
+
+For query middleware functions, we need to construct a `Query` type with a generic type of what this query should return/
+
+```ts
+UserSchema.post<Query<UserDocument, UserDocument>>(
+  "findOneAndUpdate",
+  async function(doc) {
+    // For instance, hash password
+    const pwPassedIn = this.getUpdate().$set.password;
+    if (pwPassedIn) {
+      // Implement your own hash function
+      this.set('password', hash(pwPassedIn))
+    }
+    // Other logic
+  }
+);
+```
