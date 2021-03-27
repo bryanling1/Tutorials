@@ -28,10 +28,21 @@
       - [The build process in detail](#the-build-process-in-detail)
       - [Tagging an image with `-t`](#tagging-an-image-with--t)
       - [Manual Image Generation with Docker Commit](#manual-image-generation-with-docker-commit)
-  - [NodeJS web app Demo Project](#nodejs-web-app-demo-project)
+  - [Project 1: NodeJS web app Demo Project](#project-1-nodejs-web-app-demo-project)
       - [`Dockerfile`](#dockerfile)
       - [Container Port Mapping](#container-port-mapping)
         - [`docker run -p 8080:8080 <imageid>`](#docker-run--p-80808080-imageid)
+  - [Project 2: Number of Visits with `docker compose`](#project-2-number-of-visits-with-docker-compose)
+      - [server code](#server-code)
+      - [Assembling node docker file](#assembling-node-docker-file)
+      - [Introducing Docker Compose](#introducing-docker-compose)
+      - [Docker compose file](#docker-compose-file)
+      - [Networking with Docker Compose](#networking-with-docker-compose)
+      - [Docker Compose Commands](#docker-compose-commands)
+      - [Stopping Docker Compose Containers](#stopping-docker-compose-containers)
+      - [Container Restarts](#container-restarts)
+      - [Getting Container Status](#getting-container-status)
+  - [Project #3 Development Workflow](#project-3-development-workflow)
 
 ## Diving into Docker
 <a href="https://ibb.co/ZxzC8KV"><img src="https://i.ibb.co/9WHjT2N/image.png" alt="image" border="0"></a>
@@ -115,7 +126,7 @@ kills the container
 
 #### `docker exec -it <container id> <command>`
 
--`-i` attack terminal to `stdin`
+-`-i` attach terminal to `stdin`
 -`-t` makes the text formatted pretty
 -We can use `sh` as `<command>` to open a `shell` in context of the container
 
@@ -200,7 +211,7 @@ The run the image
 docker run abcd1232131
 ```
 
-## NodeJS web app Demo Project
+## Project 1: NodeJS web app Demo Project
 
 <a href="https://imgbb.com/"><img src="https://i.ibb.co/cyx0yWY/image.png" alt="image" border="0"></a>
 
@@ -209,15 +220,18 @@ docker run abcd1232131
 ```docker
 FROM node:alpine
 
-WORKDIR server
+WORKDIR /usr/server
 
-COPY . .
-
+COPY ./package.json ./
 RUN npm install
+
+COPY ./ ./
 
 CMD ["npm", "start"]
 ```
 - `alpine` is the tag, means like smallest version
+- `WORKDIR` creates a working folder, also affects commands in `Dockerfile` and running `sh`
+- `COPY ./package.json ./` for caching as we don't want to have to install packages every time we change the source code
 
 #### Container Port Mapping 
 
@@ -228,3 +242,142 @@ CMD ["npm", "start"]
  - Second number is port inside the `container`
  - `8080` and `8080` ports do not ahve to be identical
 
+
+## Project 2: Number of Visits with `docker compose`
+
+<a href="https://ibb.co/RhYRhXj"><img src="https://i.ibb.co/3f4gfxR/image.png" alt="image" border="0"></a>
+
+#### server code
+
+```js
+const express = require('express');
+const redix = require('redis');
+
+const app = express();
+const client = redis.createClient();
+client.set('visits', 0);
+
+app.get('/', (req, res)=>{
+    client.get('visits', (err, visits)=>{
+        res.send(`Number of visits is ${visits}`);
+        client.set('visits', parseInt(visits) + 1))
+    })
+})
+
+app.listen(80801, () => {
+    console.log('listening on port 8081'):
+})
+```
+
+#### Assembling node docker file
+
+```docker
+FROM node:alpine
+
+WORKDIR '/app'
+
+COPY ./package.json ./
+RUN npm install
+
+COPY ./ ./
+
+CMD ["npm", "start"]
+```
+
+Now building the image
+
+```
+docker build -t bryanling/visists .
+```
+
+If we try to start this, it will fail to connect to redis
+#### Introducing Docker Compose
+
+The redis instance we will use is 
+```
+docker run redis
+```
+
+So for our Node App and Redis container cannot communicate with eachother
+
+We can use `Docker CLI` for network features, but it is a pain
+
+`Docker Compose` aims to fix this
+
+`Docker Compose` automates some of the long-winded arguments we were passing to `docker run`
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/74Mvf6s/image.png" alt="image" border="0"></a>
+
+#### Docker compose file
+
+Inside `docker-compose.yml`
+
+```yml
+version: '3'
+services:
+    redis-server:
+        image: 'redis'
+    node-app:
+        build: ./
+        ports: 
+            - "4001:8081"
+```
+- `version` is the version of `docker-compose`
+- We list our containers in `services`
+- `redis-server` is the `name` we camp up with for that container
+
+#### Networking with Docker Compose
+
+Let's connect to our redis server inside `index.js`
+
+```js
+...
+const client = redis.createClient({
+    host: 'redis-server',
+    port: 6379
+})
+...
+```
+- The `url` in the context of containers is the `name` we assigned to the container earlier. Docker figures out the `url` for us
+- `6379` is the default port for redis-server
+
+#### Docker Compose Commands
+
+<a href="https://ibb.co/gz94VB5"><img src="https://i.ibb.co/nzmPC5H/image.png" alt="image" border="0"></a>
+
+- `docker-compose` will automatically create our network for us
+
+#### Stopping Docker Compose Containers
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/rdGSyrG/image.png" alt="image" border="0"></a>
+
+#### Container Restarts
+
+Sometimes our containers will crash or hang
+
+<a href="https://ibb.co/7n3CF9p"><img src="https://i.ibb.co/QPWQG5H/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/1s7BSbQ"><img src="https://i.ibb.co/gvmQn69/image.png" alt="image" border="0"></a>
+
+Back in `docker-compose.yml` we can define which `restart` policy we want to use
+
+```yml
+...
+    node-app:
+        build: ./
+        ports: 
+            - "4001:8081"
+        restart: on-failure
+```
+- We need to add quotes for `no` because of yaml files
+
+#### Getting Container Status
+
+We can see the container status specific to `docker-compose` with:
+
+```sh
+docker-compose ps
+```
+- This should be run in the same directory as `docker-compose.yml`
+
+## Project #3 Development Workflow
