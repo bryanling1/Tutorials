@@ -24,6 +24,14 @@
         - [How `-it` works](#how--it-works)
   - [Building Custom Images Through Docker Server](#building-custom-images-through-docker-server)
       - [Basic Dockerfile structure](#basic-dockerfile-structure)
+      - [What  is a Base Image?](#what--is-a-base-image)
+      - [The build process in detail](#the-build-process-in-detail)
+      - [Tagging an image with `-t`](#tagging-an-image-with--t)
+      - [Manual Image Generation with Docker Commit](#manual-image-generation-with-docker-commit)
+  - [NodeJS web app Demo Project](#nodejs-web-app-demo-project)
+      - [`Dockerfile`](#dockerfile)
+      - [Container Port Mapping](#container-port-mapping)
+        - [`docker run -p 8080:8080 <imageid>`](#docker-run--p-80808080-imageid)
 
 ## Diving into Docker
 <a href="https://ibb.co/ZxzC8KV"><img src="https://i.ibb.co/9WHjT2N/image.png" alt="image" border="0"></a>
@@ -125,9 +133,98 @@ kills the container
 FROM alpine
 
 # Download and isntall a dependency
-RUN apk add --update redix
+RUN apk add --update redis
 
 # Tell the image what to do when it starts as a container
 
 CMD ["redis-server"]
 ```
+
+#### What  is a Base Image?
+
+<a href="https://ibb.co/GvqVVBH"><img src="https://i.ibb.co/0jxff8s/image.png" alt="image" border="0"></a>
+
+#### The build process in detail
+
+For every `step` in the build process, docker creates a new `temporary container` and passes the previous step's `image` to it.
+
+Each command runs as that container's `primary process`.
+
+The last step places the `primary process` but does not run it
+
+<a href="https://ibb.co/j4Gm7xD"><img src="https://i.ibb.co/4NMzBDp/image.png" alt="image" border="0"></a>
+
+- Every snapshot taken stores the `FS` and `Startup Command`
+
+#### Tagging an image with `-t`
+
+We prefix with our `Docker ID`
+
+```
+docker build -t bryanling/tagName:latest -t . 
+```
+- without `:latest` is latest by default
+
+#### Manual Image Generation with Docker Commit
+
+We won't use this very often. 
+
+We can create a container and build an image from it.
+
+```
+docker run -it alpine sh
+```
+
+Manuall install `redis`
+
+```
+apk add --update redis
+```
+
+Find the container
+
+```
+docker ps
+```
+
+Commit
+
+```
+docker commit -c 'CMD "redix-server"' 123456
+```
+- **TIP:** We can proved just the start of the `container ID` and docker will try and find it for us
+
+The run the image
+
+```
+docker run abcd1232131
+```
+
+## NodeJS web app Demo Project
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/cyx0yWY/image.png" alt="image" border="0"></a>
+
+#### `Dockerfile`
+
+```docker
+FROM node:alpine
+
+WORKDIR server
+
+COPY . .
+
+RUN npm install
+
+CMD ["npm", "start"]
+```
+- `alpine` is the tag, means like smallest version
+
+#### Container Port Mapping 
+
+<a href="https://ibb.co/PzJqvGy"><img src="https://i.ibb.co/zHCqTVg/image.png" alt="image" border="0"></a>
+
+##### `docker run -p 8080:8080 <imageid>`
+ - First number is Route incoming requests
+ - Second number is port inside the `container`
+ - `8080` and `8080` ports do not ahve to be identical
+
