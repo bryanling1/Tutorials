@@ -43,6 +43,22 @@
       - [Container Restarts](#container-restarts)
       - [Getting Container Status](#getting-container-status)
   - [Project #3 Development Workflow](#project-3-development-workflow)
+      - [Flow Specifics](#flow-specifics)
+      - [Creating the Dev Dockerfile](#creating-the-dev-dockerfile)
+      - [Starting the container](#starting-the-container)
+      - [Docker Volumes](#docker-volumes)
+      - [Shorthand with Docker Compose](#shorthand-with-docker-compose)
+      - [React App Exited With Code 0](#react-app-exited-with-code-0)
+      - [Windows not Detecting Changes](#windows-not-detecting-changes)
+      - [Docker Compose for Running Tests](#docker-compose-for-running-tests)
+      - [Need for NginX](#need-for-nginx)
+      - [Creating `Dockerfile.prod` with Multi-step build process](#creating-dockerfileprod-with-multi-step-build-process)
+  - [Project #3 continued: CI and Deployment with AWS](#project-3-continued-ci-and-deployment-with-aws)
+      - [Github setup](#github-setup)
+      - [Travis CI Setup](#travis-ci-setup)
+      - [Travis YML File Configuration](#travis-yml-file-configuration)
+      - [Important info about AWS Platform Versions](#important-info-about-aws-platform-versions)
+      - [AWS Elastic Beanstalk](#aws-elastic-beanstalk)
 
 ## Diving into Docker
 <a href="https://ibb.co/ZxzC8KV"><img src="https://i.ibb.co/9WHjT2N/image.png" alt="image" border="0"></a>
@@ -381,3 +397,227 @@ docker-compose ps
 - This should be run in the same directory as `docker-compose.yml`
 
 ## Project #3 Development Workflow
+
+#### Flow Specifics
+
+<a href="https://ibb.co/L06Vd5J"><img src="https://i.ibb.co/hgH3FfZ/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/RDPb5qM"><img src="https://i.ibb.co/qr9jZv4/image.png" alt="image" border="0"></a>
+
+We will create a create-react-app project, run it in a container, and publish it and create a `development` and `production` setup
+
+#### Creating the Dev Dockerfile
+
+Inside `Dockerfile.dev`
+
+```docker
+FROM node:alpine
+
+WORDKIR /app
+
+COPY package.json .
+RUN npm install
+
+COPY . .
+
+CMD ["npm", "run", "start"]
+```
+
+To build this image, we run:
+
+```
+docker build -f Dockerfile.dev .
+```
+
+We should delete the `node_modules` folder inside our computer's directory so that `docker` does not copy that folder over 
+
+#### Starting the container
+
+To run our container
+
+```
+docker run -it -p 3000:3000 <containerId>
+```
+- We need the `-it` flag so the react-app does not close
+
+#### Docker Volumes
+
+<a href="https://ibb.co/cv2FR26"><img src="https://i.ibb.co/DbwCmw9/image.png" alt="image" border="0"></a>
+
+- Similar to mapping ports
+  
+<a href="https://ibb.co/2jqmWKH"><img src="https://i.ibb.co/dQB1jKx/image.png" alt="image" border="0"></a>
+
+- `pwd` in bash means Personal Working Directory
+- When we use `:` it means map
+- If there is **no** `:` that means "Don't try to map it with anything". We do this because we deleted `node_modules` in our Local Folder
+  
+#### Shorthand with Docker Compose
+
+Inside `docker-compose.yml`: 
+```yml
+version: '3'
+services:
+    web:
+        build:
+            context: .
+            dockerfile: Dockerfile.dev
+        ports: 
+            - "3000:3000"
+        volumes:
+            - /app/node_modules
+            - .:/app
+
+```
+
+We could now delete `COPY . .` inside our `Dockerfile.dev`, But we should leave it just in case we no longer user `docker-compose`
+#### React App Exited With Code 0
+
+To resolve this bug, in `docker-compose.yml`: 
+```yml
+web:
+    std-in: true
+```
+
+#### Windows not Detecting Changes
+
+If on windows and react app isi not automatically reloading after a code change:
+
+```yml
+services:
+  web:
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+```
+
+#### Docker Compose for Running Tests
+
+We will create a second service in our `docker-compose.yml`
+
+```yml
+services: 
+    ...
+    tests:
+        build:
+            context: .
+            dockerfile: Dockerfile.dev
+        volumes: 
+            - /app/node_modules
+            - .:/app
+        command: ["npm", "run", "test"]
+```
+- overwrie the start command with `command`
+
+But now we don't have direct access to the commandline for `jest`
+
+We want to attack our terminal to the docker container
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/SJTrHQQ/image.png" alt="image" border="0"></a>
+
+```
+docker attach <container id>
+```
+
+But even then we can't directly interact the `jest` container
+
+<a href="https://ibb.co/ftLdX6n"><img src="https://i.ibb.co/82tgmvd/image.png" alt="image" border="0"></a>
+
+If we run `ps` inside the container, we'll notice that our `npm run test` is just running npm. That is because the running of the test is a **secondary process**, which we cannot directly access with `docker attach`
+
+#### Need for NginX
+
+<a href="https://ibb.co/BNmgJKp"><img src="https://i.ibb.co/tXSb6PG/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/rc73PVh"><img src="https://i.ibb.co/YyRX9xS/image.png" alt="image" border="0"></a>
+
+Nginx is our Production Server
+
+#### Creating `Dockerfile.prod` with Multi-step build process
+
+<a href="https://ibb.co/MCMQRFg"><img src="https://i.ibb.co/W2gjcmH/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/CWVTc6P"><img src="https://i.ibb.co/jH31NzJ/image.png" alt="image" border="0"></a>
+
+```docker
+FROM node:alpine as builder
+WORKDIR /app
+COPY package.json . 
+RUN npm install
+COPY . .
+RUN npm run build
+
+FROM nginx
+COPY --from=builder /app/build /usr/share/nginx/html
+```
+- we need to remove the `builder` tag if we want to deploy to AWS. Replace builder with `0` on the last line
+- Docker recognizes a phase by seeing another `FROM` statement
+- `/usr/share/nginx/html` is from nginx documentation
+
+Now we can build the image
+```
+docker build . 
+```
+
+And run it
+```
+docker run -p 8080:80 <containerId>
+```
+- default port is `80` for `nginx`
+
+## Project #3 continued: CI and Deployment with AWS
+
+<a href="https://ibb.co/nD8MgBb"><img src="https://i.ibb.co/2jY3nSy/image.png" alt="image" border="0"></a>
+#### Github setup
+
+Make a github repo with our files
+
+#### Travis CI Setup
+
+[Login to Travis with Github](https://travis-ci.org/)
+
+Enable our github repo we want to activate
+
+<a href="https://ibb.co/1mzD57r"><img src="https://i.ibb.co/P6D7nFc/image.png" alt="image" border="0"></a>
+
+#### Travis YML File Configuration
+
+<a href="https://ibb.co/dP6mp9f"><img src="https://i.ibb.co/Lx6Ngw0/image.png" alt="image" border="0"></a>
+- Using `Docker.dev` because we want to **run tests**
+
+Create `.travis.yml` in our root directory
+
+```yml
+sudo: required
+language: generic
+services: 
+    - docker
+before_install:
+ - docker build -t bryanling/docker-react -f Dockerfile.dev .
+
+script:
+  - docker run -e CI=true bryanling/docker-react npm run test
+```
+- `before_install` before running test/deploying
+
+When we make a new push to our repo, we should see this:
+
+<a href="https://ibb.co/DVyJkvH"><img src="https://i.ibb.co/1v5gKPt/image.png" alt="image" border="0"></a>
+
+#### Important info about AWS Platform Versions
+
+On October 6, AWS made some significant platform changes that will affect our `single container application`. Among these changes was adding the full support of using `Docker Compose` to provision a production AWS environment. This means that **Elastic Beanstalk** will no longer first look for a `Dockerfil`, it will first look for a `docker-compose` file and attempt to build and run a container from it.
+
+**When creating our Elastic Beanstalk environment in the next lecture, we need to select Docker running on `64bit Amazon Linux`** instead of Docker running on `64bit Amazon Linux 2`. This will ensure that our container is built using the Dockerfile and not the compose file.
+
+#### AWS Elastic Beanstalk
+
+Great for single container applications
+
+After we create a **Elastic Beanstalk** application, we want to create an `environment`
+
+Choose web
+
+Select **Platform** as **Docker**, then **Create Environment**
+
+<a href="https://ibb.co/hYFgwgX"><img src="https://i.ibb.co/9ZHpSpw/image.png" alt="image" border="0"></a>
+- Load Balancer is **Elactic Beanstalk's**
