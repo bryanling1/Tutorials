@@ -68,6 +68,10 @@
       - [Project Overview](#project-overview)
       - [Creating the Docker Compose file with Build, Volumes, and Environment Variables](#creating-the-docker-compose-file-with-build-volumes-and-environment-variables)
         - [Environment Variables](#environment-variables)
+      - [Routing with Nginx](#routing-with-nginx)
+      - [Building a Custom Nginx Image](#building-a-custom-nginx-image)
+      - [Starting up Docker Compose](#starting-up-docker-compose)
+      - [Opening Websocket Connections](#opening-websocket-connections)
 
 ## Diving into Docker
 <a href="https://ibb.co/ZxzC8KV"><img src="https://i.ibb.co/9WHjT2N/image.png" alt="image" border="0"></a>
@@ -742,6 +746,7 @@ services:
       - REDIS_PORT=6379
       ...
   client:
+    stdin_open: true
     build: 
       dockerfile: Dockerfile.dev
       context: ./client
@@ -756,6 +761,102 @@ services:
       ...
 ```
 - `REDIS_HOST=redis` because we named it `redis`
+- `stdin_open: true` otherwise we will get an error `React App exited with Code 0`
 ##### Environment Variables
 
 <a href="https://ibb.co/BzGXD7m"><img src="https://i.ibb.co/HFCWvM0/image.png" alt="image" border="0"></a>
+
+#### Routing with Nginx
+
+<a href="https://ibb.co/PxvtL5L"><img src="https://i.ibb.co/VVc31v1/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/jW6f8b2"><img src="https://i.ibb.co/F0x3hmM/image.png" alt="image" border="0"></a>
+
+Inside `nginx/default.conf`
+
+```conf
+upstream client{
+  server client:3000;
+}
+
+upstream api{
+  server api:5000;
+}
+
+server{
+  listen 80;
+  location / {
+    proxy_pass http://client;
+  }
+
+  loaction /api {
+    rewrite /api/(.*) /$1 break;
+    proxy_pass http://api;
+  }
+}
+```
+-`$1` is a match to the value of regex `(.*)`
+
+#### Building a Custom Nginx Image
+
+Inside `nginx/Dockerfile.dev`
+
+```docker
+FROM nginx
+COPY ./default.conf /etc/nginx/conf.d/
+```
+- `COPY ./default.conf /etc/nginx/conf.d/` From info on Nginx Docker hub
+
+Now inside `docker-compse.yml`
+
+```yml
+...
+nginx:
+  depends_on:
+    - api
+    -client
+  restart: always
+  build:
+    dockerFile: Dockerfile.dev
+    context: ./nginx
+  ports:
+    - '3050:80'
+```
+
+#### Starting up Docker Compose
+
+It is possible that our application will fail and restarts are needed
+
+This is becuase docker may have to download new images and some containers are depended on them
+
+```
+docker-compose up --build
+```
+
+#### Opening Websocket Connections
+
+Write now if we try to run visit our wite we wills see this error:
+
+<a href="https://ibb.co/kmLP0Wz"><img src="https://i.ibb.co/41b0M5C/image.png" alt="image" border="0"></a>
+
+This is because Create-react-app's development server listens via WebSocket for changes
+
+We have not setup nginx to allow this socker
+
+Inside `nginx/defualt.conf`
+
+```conf
+...
+location /sockjs {
+  proxy_pass http://client;
+  proxy_http_version 1.1;
+  proxy_setup_header Upgrade $http_upgrade;
+  proxy_set_header Connection "Upgrade";
+}
+```
+
+Now we can rebuild
+
+```
+docker-compose up --build
+```
