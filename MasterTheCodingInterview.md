@@ -14,6 +14,11 @@
   - [Minimum Brackets to Remove](#minimum-brackets-to-remove)
   - [Implement a Queue class using stacks](#implement-a-queue-class-using-stacks)
 - [Recursion](#recursion)
+- [Sorting](#sorting)
+  - [Bubble Sort](#bubble-sort)
+  - [Selection Sort](#selection-sort)
+  - [Insertion Sort](#insertion-sort)
+  - [Merge Sort](#merge-sort)
 # Palindromes
 
 - Often appear as string sub problems
@@ -241,3 +246,26 @@ class QueueWithStack{
 <a href="https://ibb.co/Xj6dTyP"><img src="https://i.ibb.co/S5H1pQg/image.png" alt="image" border="0"></a>
 
 <a href="https://ibb.co/svcvxJ8"><img src="https://i.ibb.co/mCdCZFf/image.png" alt="image" border="0"></a>
+
+# Sorting
+
+<a href="https://ibb.co/WDncfG0"><img src="https://i.ibb.co/XyXztjD/image.png" alt="image" border="0"></a>
+
+## Bubble Sort
+
+Swapping pairs 
+
+<a href="https://ibb.co/KsbdQGb"><img src="https://i.ibb.co/xgXWcsX/image.png" alt="image" border="0"></a>
+
+## Selection Sort
+
+Find the smallest element, place to next in the list
+
+## Insertion Sort
+
+<a href="https://ibb.co/ccbxZgZ"><img src="https://i.ibb.co/xSm3BCB/image.png" alt="image" border="0"></a>
+
+Good for small data and when the list is almost sorted
+
+## Merge Sort
+
