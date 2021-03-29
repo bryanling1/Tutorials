@@ -59,6 +59,15 @@
       - [Travis YML File Configuration](#travis-yml-file-configuration)
       - [Important info about AWS Platform Versions](#important-info-about-aws-platform-versions)
       - [AWS Elastic Beanstalk](#aws-elastic-beanstalk)
+      - [Travis Config for Deployment](#travis-config-for-deployment)
+      - [Automated Deployments](#automated-deployments)
+        - [IAM](#iam)
+      - [Exposing Ports Through the Dockerfile](#exposing-ports-through-the-dockerfile)
+      - [AWS Configuration Cheat Sheet](#aws-configuration-cheat-sheet)
+  - [Project #4: Multi-Container Application](#project-4-multi-container-application)
+      - [Project Overview](#project-overview)
+      - [Creating the Docker Compose file with Build, Volumes, and Environment Variables](#creating-the-docker-compose-file-with-build-volumes-and-environment-variables)
+        - [Environment Variables](#environment-variables)
 
 ## Diving into Docker
 <a href="https://ibb.co/ZxzC8KV"><img src="https://i.ibb.co/9WHjT2N/image.png" alt="image" border="0"></a>
@@ -573,7 +582,7 @@ Make a github repo with our files
 
 #### Travis CI Setup
 
-[Login to Travis with Github](https://travis-ci.org/)
+[Login to Travis with Github](https://travis-ci.com/)
 
 Enable our github repo we want to activate
 
@@ -621,3 +630,132 @@ Select **Platform** as **Docker**, then **Create Environment**
 
 <a href="https://ibb.co/hYFgwgX"><img src="https://i.ibb.co/9ZHpSpw/image.png" alt="image" border="0"></a>
 - Load Balancer is **Elactic Beanstalk's**
+
+#### Travis Config for Deployment
+Inside `.travis.yml`
+```yml
+...
+deploy:
+    provider: elasticbeanstalk
+    region: "us-east-1"
+    app: "docker"
+    env: "Docker-env"
+    bucket_name: "docker-123abc"
+    bucket_path: "docker"
+    on: 
+        branch: main
+```
+- `region` is from Elastic Beanstalk instance region (can find via url)
+- `app` is the name of our **Application name** from our **Beanstalk Application**, asme with `env`
+- We can find bucket_name in `s3` from **AWS**
+- `bucket_path` should be the same as `app` as it is created in s3
+- `on` says only on main branch pushes
+
+#### Automated Deployments
+
+##### IAM
+
+`Identity and Access Management` is an AWS service
+
+First let's create a user
+
+<a href="https://ibb.co/8MbFN7H"><img src="https://i.ibb.co/NxrwtyM/image.png" alt="image" border="0"></a>
+
+And give it Beanstalk policy 
+<a href="https://ibb.co/j3fJk7T"><img src="https://i.ibb.co/YfQ0Bv3/image.png" alt="image" border="0"></a>
+
+And get the Secret access key
+
+We can stash these keys on the Travis website
+
+Inside `.travis.yml`, we can make use of **environment secrets**
+
+```yml
+...
+deploy:
+    provider: elasticbeanstalk
+    region: "us-east-1"
+    app: "docker"
+    env: "Docker-env"
+    bucket_name: "docker-123abc"
+    bucket_path: "docker"
+    on: 
+        branch: main
+    access_key_id: $AWS_ACCESS_KEY
+    secret_access_key: $AWS_SECRET_KEY
+```
+
+Now when we push to our main branch, AWS will attempt to deploy our container
+
+But it won't work because we need to expose ports from inside our container
+
+#### Exposing Ports Through the Dockerfile
+
+Inside our Deployment `Dockerfile`
+
+```docker
+...
+FROM nginx
+EXPOSE 80
+...
+```
+- Expose doesn't do anything on its own, but **Elastic Beanstalk** uses it
+
+We should Terminate our app as AWS costs money 
+
+#### [AWS Configuration Cheat Sheet](https://www.udemy.com/course/docker-and-kubernetes-the-complete-guide/learn/lecture/20676694#overview)
+
+## Project #4: Multi-Container Application
+
+<a href="https://ibb.co/LkQ2qn4"><img src="https://i.ibb.co/h7XtnDp/image.png" alt="image" border="0"></a>
+
+#### Project Overview
+
+<a href="https://ibb.co/stXwybd"><img src="https://i.ibb.co/BwYZqc5/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/kgsZQx7"><img src="https://i.ibb.co/wNFtMRk/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/BqtJP80"><img src="https://i.ibb.co/V2tGNXf/image.png" alt="image" border="0"></a>
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/FhZVR9C/image.png" alt="image" border="0"></a>
+
+#### Creating the Docker Compose file with Build, Volumes, and Environment Variables
+
+```yml
+version: '3'
+services:
+  postgres:
+    image: 'postgres:latest'
+    environment:
+      - POSTGRES_PASSWORD=postgres_password
+  redis:
+    image: 'redis:latest'
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    volumes:
+      - /app/node_modules
+      - ./server:/app
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      ...
+  client:
+    build: 
+      dockerfile: Dockerfile.dev
+      context: ./client
+    volumes:
+      - /app/node_modules
+      - ./client:./app
+  worker:
+    build:
+      dockerfile: Dockerfile.dev
+      context: ./worker
+    volumes:
+      ...
+```
+- `REDIS_HOST=redis` because we named it `redis`
+##### Environment Variables
+
+<a href="https://ibb.co/BzGXD7m"><img src="https://i.ibb.co/HFCWvM0/image.png" alt="image" border="0"></a>
