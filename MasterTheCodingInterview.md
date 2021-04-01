@@ -14,11 +14,13 @@
   - [Minimum Brackets to Remove](#minimum-brackets-to-remove)
   - [Implement a Queue class using stacks](#implement-a-queue-class-using-stacks)
 - [Recursion](#recursion)
+  - [Kth Largest Element](#kth-largest-element)
 - [Sorting](#sorting)
   - [Bubble Sort](#bubble-sort)
   - [Selection Sort](#selection-sort)
   - [Insertion Sort](#insertion-sort)
   - [Merge Sort](#merge-sort)
+  - [Quick Sort](#quick-sort)
 # Palindromes
 
 - Often appear as string sub problems
@@ -247,6 +249,9 @@ class QueueWithStack{
 
 <a href="https://ibb.co/svcvxJ8"><img src="https://i.ibb.co/mCdCZFf/image.png" alt="image" border="0"></a>
 
+## Kth Largest Element
+
+Given an unsorted array, return the kth largest element. It is the kth largest element in sorted order, not the kth distinct element.
 # Sorting
 
 <a href="https://ibb.co/WDncfG0"><img src="https://i.ibb.co/XyXztjD/image.png" alt="image" border="0"></a>
@@ -268,4 +273,109 @@ Find the smallest element, place to next in the list
 Good for small data and when the list is almost sorted
 
 ## Merge Sort
+
+<a href="https://ibb.co/gtRcqpX"><img src="https://i.ibb.co/BTCYWx7/image.png" alt="image" border="0"></a>
+
+```js
+const innerSort = (arr1, arr2) => {
+    let p1=0;
+    let p2=0;
+    let out = [];
+
+    while(p1 < arr1.length && p2 < arr2.length){
+        if(arr1[p1] < arr2[p2]){
+            out.push(arr1[p1]);
+            p1 ++;
+        }else{
+            out.push(arr2[p2]);
+            p2 ++;
+        }
+    }
+
+    if(p1 < arr1.length){
+        out = out.concat(arr1.slice(p1))
+    }
+
+    if(p2 < arr2.length){
+        out = out.concat(arr2.slice(p2))
+    }
+
+    return out;
+}
+
+const mergeSort = (arr) =>{
+    if(arr.length < 2){
+        return arr
+    }
+
+    const mid = Math.floor(arr.length / 2);
+    const arr1 = mergeSort(arr.slice(0, mid));
+    const arr2 = mergeSort(arr.slice(mid));
+
+    return innerSort(arr1, arr2);
+}
+module.exports = {
+    innerSort,
+    mergeSort,
+};
+
+```
+
+## Quick Sort
+
+Pick a pivot point
+
+<a href="https://ibb.co/1724c6x"><img src="https://i.ibb.co/pbXkqyp/image.png" alt="image" border="0"></a>
+
+```js
+//picks pivot point as last element
+const innerSort = (start, end, arr) => {
+    let p2 = end
+    let p1 = start
+
+    while(p1 < p2){
+        if(arr[p1] > arr[p2]){
+            let temp = arr[p2];
+            arr[p2] = arr[p1]
+            arr[p1] = temp;
+            if(p2 - p1 > 1){
+                let temp = arr[p1]
+                arr[p1] = arr[p2 - 1]
+                arr[p2 - 1] = temp
+            }else{
+                p1++;
+            }
+            p2--;
+        }else{
+            p1++
+        }
+    }
+
+    return p2
+}
+
+const quickSort = (arr, start=0, end=arr.length - 1) => {
+    let p1 = start;
+    let p2 = end;
+
+    if(p1 === p2){
+        return;
+    }
+
+    const pivot = innerSort(p1, p2, arr);
+
+    if(pivot > 0){
+        quickSort(arr, p1, pivot - 1);
+    }
+
+    if(pivot < p2){
+        quickSort(arr, pivot + 1, p2);
+    }
+}
+
+module.exports = {
+    innerSort,
+    quickSort
+}
+```
 
