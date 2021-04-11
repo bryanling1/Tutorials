@@ -14,7 +14,9 @@
   - [Minimum Brackets to Remove](#minimum-brackets-to-remove)
   - [Implement a Queue class using stacks](#implement-a-queue-class-using-stacks)
 - [Recursion](#recursion)
+  - [Divide and Conquer](#divide-and-conquer)
   - [Kth Largest Element](#kth-largest-element)
+    - [Hoare's Quickselect Algorithm](#hoares-quickselect-algorithm)
 - [Sorting](#sorting)
   - [Bubble Sort](#bubble-sort)
   - [Selection Sort](#selection-sort)
@@ -249,9 +251,68 @@ class QueueWithStack{
 
 <a href="https://ibb.co/svcvxJ8"><img src="https://i.ibb.co/mCdCZFf/image.png" alt="image" border="0"></a>
 
+## Divide and Conquer
+
+1. Multi-branched recursion
+2. Breaks a problem into multipel smaller but same sub-problems
+3. Combines the solutions of sub-problems into the solution for the original problem (putting them all together)
+
+
 ## Kth Largest Element
 
 Given an unsorted array, return the kth largest element. It is the kth largest element in sorted order, not the kth distinct element.
+
+### Hoare's Quickselect Algorithm
+
+Quicksort, but we only sort the side in which the target index is greater or larger than
+
+```js
+
+var findKthLargest = function(nums, k) {
+    const indexToFind = nums.length - k;
+    quickSelect(nums, 0, nums.length -1, indexToFind);
+    return nums[indexToFind]
+};
+
+const quickSelect = function(array, left, right, indexToFind){
+    if(left < right){
+        const pivot = innerSort(array, left, right);
+        if(pivot === indexToFind){
+            return array[pivot]
+        }else if(pivot < indexToFind){
+            quickSelect(array, pivot + 1, right, indexToFind)
+        }else{
+            quickSelect(array, left, pivot - 1, indexToFind)
+        }
+    }
+}
+
+const innerSort = function(nums, start, end){
+    let i = start;
+    let j = start;
+
+    while(j < end){
+        if(nums[j] < nums[end]){
+            let temp = nums[j];
+            nums[j] = nums[i];
+            nums[i] = temp;
+            i++;
+            j++;
+        }else{
+            j++;
+        }
+    }
+
+    const temp = nums[end]
+    nums[end] = nums[i]
+    nums[i] = temp
+
+    return i;
+}
+```
+- Average time complexity is `O(n)` (n + n/2 + n/4 ... = 2n)
+- Worst case is `(O(n^2))` when the array is in reverse sorted order
+
 # Sorting
 
 <a href="https://ibb.co/WDncfG0"><img src="https://i.ibb.co/XyXztjD/image.png" alt="image" border="0"></a>
@@ -328,54 +389,35 @@ Pick a pivot point
 <a href="https://ibb.co/1724c6x"><img src="https://i.ibb.co/pbXkqyp/image.png" alt="image" border="0"></a>
 
 ```js
-//picks pivot point as last element
-const innerSort = (start, end, arr) => {
-    let p2 = end
-    let p1 = start
+const quickSort = function(array, left=0, right=array.length - 1){
+    if(left < right){
+        const pivot = innerSort(array, left, right);
+        quickSort(array, pivot + 1, right)
+        quickSort(array, left, pivot - 1)
+    }
+}
 
-    while(p1 < p2){
-        if(arr[p1] > arr[p2]){
-            let temp = arr[p2];
-            arr[p2] = arr[p1]
-            arr[p1] = temp;
-            if(p2 - p1 > 1){
-                let temp = arr[p1]
-                arr[p1] = arr[p2 - 1]
-                arr[p2 - 1] = temp
-            }else{
-                p1++;
-            }
-            p2--;
+const innerSort = function(nums, start, end){
+    let i = start;
+    let j = start;
+
+    while(j < end){
+        if(nums[j] < nums[end]){
+            let temp = nums[j];
+            nums[j] = nums[i];
+            nums[i] = temp;
+            i++;
+            j++;
         }else{
-            p1++
+            j++;
         }
     }
 
-    return p2
-}
+    const temp = nums[end]
+    nums[end] = nums[i]
+    nums[i] = temp
 
-const quickSort = (arr, start=0, end=arr.length - 1) => {
-    let p1 = start;
-    let p2 = end;
-
-    if(p1 === p2){
-        return;
-    }
-
-    const pivot = innerSort(p1, p2, arr);
-
-    if(pivot > 0){
-        quickSort(arr, p1, pivot - 1);
-    }
-
-    if(pivot < p2){
-        quickSort(arr, pivot + 1, p2);
-    }
-}
-
-module.exports = {
-    innerSort,
-    quickSort
+    return i;
 }
 ```
 
