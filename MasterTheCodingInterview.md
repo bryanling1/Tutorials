@@ -17,12 +17,24 @@
   - [Divide and Conquer](#divide-and-conquer)
   - [Kth Largest Element](#kth-largest-element)
     - [Hoare's Quickselect Algorithm](#hoares-quickselect-algorithm)
+  - [Binary Search](#binary-search)
+    - [Start And End of Target in a Sorted Array](#start-and-end-of-target-in-a-sorted-array)
 - [Sorting](#sorting)
   - [Bubble Sort](#bubble-sort)
   - [Selection Sort](#selection-sort)
   - [Insertion Sort](#insertion-sort)
   - [Merge Sort](#merge-sort)
   - [Quick Sort](#quick-sort)
+- [Trees](#trees)
+  - [Binary Tree](#binary-tree)
+  - [Binary Search Tree](#binary-search-tree)
+  - [PreOrder, InOrder, PostOrder](#preorder-inorder-postorder)
+  - [Searching every elment O(n)](#searching-every-elment-on)
+    - [Breadth First Search (BFS)](#breadth-first-search-bfs)
+    - [Depth First Search (DFS)](#depth-first-search-dfs)
+  - [Binary Tree Approach](#binary-tree-approach)
+  - [Maximum Depth of Binary Tree](#maximum-depth-of-binary-tree)
+  - [Level Order Of Binary Tree](#level-order-of-binary-tree)
 # Palindromes
 
 - Often appear as string sub problems
@@ -313,6 +325,105 @@ const innerSort = function(nums, start, end){
 - Average time complexity is `O(n)` (n + n/2 + n/4 ... = 2n)
 - Worst case is `(O(n^2))` when the array is in reverse sorted order
 
+## Binary Search
+
+```js
+const binarySearch = function(array, target){
+  let left = 0;
+  let right = array.length;
+
+  while(left <= right){
+    const mid = Math.floor((left + right)/2);
+    const foundVal = array[mid];
+    if(foundVal === target){
+      return mid;
+    }else if(foundVal < target){
+      left = mid + 1;
+    }else{
+      right = mid - 1;
+    }
+  }
+
+  return -1;
+}
+```
+### Start And End of Target in a Sorted Array
+
+Given an array of interegers **sorted** in ascending order, return the starting and ending index of a given target value in an array, i.e [x, y]. 
+
+Your solutin should run in logN time.
+
+We see that the given array is **sorted** so we should expect some sort of use of **Binary Search**
+
+```
+[1, 3, 3, 5, 5, 5, 8, 9] t=5 --> [3, 5]
+
+[1, 2, 3, 4, 5, 6] t=4 --> [3, 3]
+
+[1, 2, 3, 4, 5] t=9 --> [-1, -1]
+
+[] t=9 --> [-1, -1]
+```
+
+**Idea**
+We want to find the middle point of the **block** of our target value with binary search. 
+
+Then, partition the left and right sides, and do another binary search to find where it ends.
+
+```js
+/**
+ * @param {number[]} nums
+ * @param {number} target
+ * @return {number[]}
+ */
+var searchRange = function(nums, target) {
+    //Find the middle of the block
+    const mid = binSearch(nums, 0, nums.length - 1, target);
+    if(mid === -1){
+        return [-1, -1];
+    }
+    //Find the left side
+    let start = mid;
+    let end = mid;
+    let temp1; temp2;
+
+    while(start !== -1){
+      temp1 = start;
+      start = binSearch(nums, 0, start - 1, target);
+    }
+
+    start = temp1;
+
+    while(end !== -1){
+      temp2 = end;
+      end = binSearch(nums, end + 1, nums.length - 1, target);
+    }
+
+    end = temp2;
+
+    return [start, end]
+};
+
+const binSearch = function(array, left, right, target){
+    let left = 0;
+    let right = array.length - 1;
+
+    while(left <= right){
+        const mid = Math.floor((left + right)/2);
+        const val = array[mid];
+        if(val === target){
+            return mid
+        }else if(val < target){
+            left = mid + 1;
+        }else{
+            right = mid - 1;
+        }
+    }
+    return -1;
+}
+```
+
+
 # Sorting
 
 <a href="https://ibb.co/WDncfG0"><img src="https://i.ibb.co/XyXztjD/image.png" alt="image" border="0"></a>
@@ -420,4 +531,114 @@ const innerSort = function(nums, start, end){
     return i;
 }
 ```
+
+# Trees
+
+## Binary Tree
+
+Each parent either has 0, 1, 2, children
+
+## Binary Search Tree
+
+- Left child is smaller than the current node
+
+- Right child is greather than the current node
+
+- Unbalanced tress have a O(n) in worst cases, turns into a linked list
+
+- No O(1) operationsa
+
+## PreOrder, InOrder, PostOrder
+
+**InOrder:** It returns the values in a BST in order
+**PreOrder:** Parent, left-child, right-child
+  - Useful for recreating a tree from a PreOrdered array
+**PostOrder:** left-child, right-child, parent
+
+## Searching every elment O(n)
+### Breadth First Search (BFS)
+
+- Top to bottom, left to right
+- Shortest Path
+- Closer Nodes
+- High memory requirement because we have to store the list of children nodes
+  - Use a queue for this
+
+**Use Cases**
+- Answer not far from the roof the tree
+- If the tree is very deep and solutions are rare;
+- Finding the shortest path
+
+```js
+class BinarySearchTree{
+  constructor(){
+    this.root = null;
+  }
+
+  insert(value){...}
+
+  lookup(value){...}
+
+  remove(value){...}
+
+  breadthFirstSearch(){
+    let currentNode = this.root;
+    let list = [];
+    let queue = [];
+    queue.push(currentNode);
+
+    while(queue.length > 0){
+      currentNode = queue.shift();
+      list.push(currentNode.value);
+      if (currentNode.left){
+        queue.push(currentNode.left)
+      }
+      if (currentNode.right){
+        queue.push(currentNode.right);
+      }
+    }
+    return list;
+  }
+}
+```
+
+### Depth First Search (DFS)
+
+- Visit every child then go back up
+- Lower memory requirement
+- Good at answering "Does Path Exist?"
+- Can be slow
+
+**Use Cases**
+- If the tree is very wide (BFS would use too much memo)
+- If solutions are frequent but located deep in the tree
+- Determining if a path exists between two nodes
+
+
+## Binary Tree Approach
+
+1. Do I need to traverse the tree (98% of the time)
+2. How? (BFS or DFS)
+3. If DFS, which traversal type if we care about the values
+   
+## Maximum Depth of Binary Tree
+
+1. Furthest leaf node, so we know its DFS
+  
+```js
+function recurise(node, count=0){
+  if(!node){
+    return count;
+  }
+
+  count++;
+
+  return Math.max(recurse(node.left, count), recurse(node.right, count));
+}
+``` 
+
+## Level Order Of Binary Tree
+
+
+
 
