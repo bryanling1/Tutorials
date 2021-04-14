@@ -6,7 +6,9 @@
   - [Handling different types of errors on the Frontend](#handling-different-types-of-errors-on-the-frontend)
 ## Handling different types of errors on the Frontend
 
+[Source 2021/04/13](https://stackoverflow.com/questions/49967779/axios-handling-errors)
 ```js
+axios.get('/api/xyz/abcd')
 .catch((error) => {
         if (error.response) {
           // Request made and server responded
