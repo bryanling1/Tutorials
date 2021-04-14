@@ -639,6 +639,57 @@ function recurise(node, count=0){
 
 ## Level Order Of Binary Tree
 
+Essentially implement BFS but each level has its own array.
+
+**Idea**
+- identify tree level by adding a counter
+- Count the number of elements in the next level by looking at the children
+```js
+/**
+ * Definition for a binary tree node.
+ * function TreeNode(val, left, right) {
+ *     this.val = (val===undefined ? 0 : val)
+ *     this.left = (left===undefined ? null : left)
+ *     this.right = (right===undefined ? null : right)
+ * }
+ */
+/**
+ * @param {TreeNode} root
+ * @return {number[][]}
+ */
+var levelOrder = function(root) {
+    if(!root){
+        return [];
+    }
+    
+    let currentNode = root;
+    let list = [];
+    let queue = [];
+    
+    
+    queue.push(currentNode);
+
+    while(queue.length > 0){
+        let elementsInLevel = queue.length;
+        let count = 0;
+        const currentLevelItems = [];
+        while(count < elementsInLevel){
+            currentNode = queue.shift();
+            currentLevelItems.push(currentNode.val)
+            count ++;
+            if (currentNode.left){
+              queue.push(currentNode.left)
+              }
+            if (currentNode.right){
+              queue.push(currentNode.right);
+            }
+        }
+        list.push(currentLevelItems)
+    }
+    return list;
+};
+```
+
 
 
 
