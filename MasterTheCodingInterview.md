@@ -35,6 +35,13 @@
   - [Binary Tree Approach](#binary-tree-approach)
   - [Maximum Depth of Binary Tree](#maximum-depth-of-binary-tree)
   - [Level Order Of Binary Tree](#level-order-of-binary-tree)
+  - [Right Side View Tree](#right-side-view-tree)
+  - [Number of Nodes in Complete Tree](#number-of-nodes-in-complete-tree)
+    - [Complete Tree](#complete-tree)
+    - [Full tree](#full-tree)
+    - [Idea](#idea)
+- [General tips to solving problems](#general-tips-to-solving-problems)
+  - [Validate Binary Search Tree](#validate-binary-search-tree)
 # Palindromes
 
 - Often appear as string sub problems
@@ -567,6 +574,7 @@ Each parent either has 0, 1, 2, children
 **Use Cases**
 - Answer not far from the roof the tree
 - If the tree is very deep and solutions are rare;
+  - Space complexity of O(Width of tree)
 - Finding the shortest path
 
 ```js
@@ -612,6 +620,7 @@ class BinarySearchTree{
 **Use Cases**
 - If the tree is very wide (BFS would use too much memo)
 - If solutions are frequent but located deep in the tree
+  - Space complexity of O(Height of tree)
 - Determining if a path exists between two nodes
 
 
@@ -690,6 +699,151 @@ var levelOrder = function(root) {
 };
 ```
 
+## Right Side View Tree
+
+Given a binary tree, imagine you're standing to the right of the tree. Retrun an array of the values of the nodes you can soo ordered from top to bottom.
+
+We can use the similar solution from the last question using BFS.
+
+**DFS Idea**
+- Prioritize finding the right most values
+- We need to someone keep track of the level of our nodes
+- We can use
+
+```js
+var rightSideView = function(root) {
+    const out = []
+    dfs(root, 0, out)
+    return out;
+};
 
 
+const dfs = function(root, level, result){
+    if(!root){
+        return
+    }
+    if (level >= result.length){
+        result.push(root.val);
+    }
+    if(root.right){
+        dfs(root.right, level+1, result)
+    }
+    if(root.left){
+        dfs(root.left, level+1, result)
+    }
+}
+```
 
+## Number of Nodes in Complete Tree
+
+Given a complete binary tress, count the number of nodes.
+<a href="https://ibb.co/HTDqWjM"><img src="https://i.ibb.co/pjvdtSs/image.png" alt="image" border="0"></a>
+
+We can obviously do DFS, but since it is a complete binary tree we can optimize
+### Complete Tree
+- Every level is completely full, except for the last level which all extres nodes need to be pushed to the left as far as they can be.
+
+### Full tree
+- Every node has either 2 or 0 children
+
+### Idea
+- Utilise the fact that the tree is complete
+- Divide the question into 2 problems: 
+  1. Get to the last level
+     - We can observe that the number of nodes at the nth level is 2^(n-1) - 1
+     - We can get the height of three by traversing down the left side all the way (since the tree is complete)
+  2. Count the number of nodes in the last level
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/ns1FNSK/image.png" alt="image" border="0"></a>
+     - Binary search the last level
+     - We know that the **minimum** is 1, **maximum** is 2^(n-1)
+     - If we use indecies to label the nodes, If we find the last node in the last level (i) the total number of nodes in that level is i + 1
+     - We `ceil` the mid value instead of `floor` because our midpoint is **inclusive** (Looking for a position)
+     - We resetting the left and right pointers, set `left` to `mid` or `right` to `mid - 1`
+       - Since we know that if we set `right` pointer, everying to the right of it **including itself** isn't a node
+      - Stop when the `left` and `right` pointer are equal 
+    - To traverse to the node we are searching for, we can use an approach similar to **binary search**
+     - Calculate the `mid` value and round up
+     - If the value of `mid` is less than our equal to `search index`, we go to the right. Then reposition the pointers and repeat
+   
+```js
+/**
+ * Definition for a binary tree node.
+ * function TreeNode(val, left, right) {
+ *     this.val = (val===undefined ? 0 : val)
+ *     this.left = (left===undefined ? null : left)
+ *     this.right = (right===undefined ? null : right)
+ * }
+ */
+/**
+ * @param {TreeNode} root
+ * @return {number}
+ */
+const countNodes = function(root){
+  if(!root){
+    return 0;
+  }
+  //First get the number of levels
+  let levels = 0;
+  let temp = root;
+  while(temp){
+    levels ++;
+    temp = temp.left;
+  }
+
+  //Set are left and right pointers
+  const lengthOfLast = 2**(levels - 1);
+  let left = 0;
+  let right = lengthOfLast - 1;
+
+  while(left < right){
+    const mid = Math.ceil((right + left) / 2);
+    const result = ithNodeInLastLevel(root, mid, lengthOfLast);
+
+    if(result){
+      left = mid;
+    }else{
+      right = mid - 1;
+    }
+  }
+
+  return left + lengthOfLast;
+
+}
+
+const ithNodeInLastLevel = function(root, i, length){
+    let temp = root;
+  let left = 0;
+  let right = length - 1;
+
+  while(left < right){
+    const mid = Math.ceil((right + left) / 2);
+    if(mid <= i){
+      //go right
+      left = mid;
+        temp = temp.right;
+        
+    }else{
+      //go left
+      right = mid - 1;
+      temp = temp.left;
+    }
+  }
+
+  return temp ? true : false;
+}
+```
+
+
+# General tips to solving problems
+
+- Write down absolutelty everything that we know during a small step
+  - Arrays
+    - Length of the array
+    - If certain values only appear to the left or right
+    - If the question is in **sorted order** we probably need **binary search**
+
+
+## Validate Binary Search Tree
+
+Given a binary tree, determine if it is a valid binary search tree
