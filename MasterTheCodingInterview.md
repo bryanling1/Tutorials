@@ -42,6 +42,7 @@
     - [Idea](#idea)
   - [Validate Binary Search Tree](#validate-binary-search-tree)
   - [Contraints](#contraints)
+    - [Idea](#idea-1)
 - [General tips to solving problems](#general-tips-to-solving-problems)
 # Palindromes
 
@@ -846,6 +847,41 @@ Given a binary tree, determine if it is a valid binary search tree
 
 - Are there duplicate values in the tree? If so, how do we handle them?
   
+<a href="https://ibb.co/CMgLxmt"><img src="https://i.ibb.co/8dqkFNB/image.png" alt="image" border="0"></a>
+
+### Idea
+- Update the boundaries when we traverse down the tree
+- Go `right` update `min`, go `left` update `max` with current value;
+
+```js
+const isValidBST = function(root){
+  if(!root) return true;
+
+  return dfs(root, -Infinity, Infinity)
+}
+
+const dfs = function(root, min, max){
+  if(node.val <= min || node.val >= max){
+    return false;
+  }
+
+  if(node.left){
+    if(!dfs(node.left, min, node.val)){
+      return false;
+    }
+  }
+
+  if(node.right){
+    if(!dfs(node.right, node.val, max)){
+      return false;
+    }
+  }
+
+  return true;
+}
+
+```
+- We can't just `return dfs(node.left, min, node.val)` when we check the children because we need to make sure we check both the left and right children.
 
 # General tips to solving problems
 
