@@ -40,8 +40,9 @@
     - [Complete Tree](#complete-tree)
     - [Full tree](#full-tree)
     - [Idea](#idea)
-- [General tips to solving problems](#general-tips-to-solving-problems)
   - [Validate Binary Search Tree](#validate-binary-search-tree)
+  - [Contraints](#contraints)
+- [General tips to solving problems](#general-tips-to-solving-problems)
 # Palindromes
 
 - Often appear as string sub problems
@@ -835,15 +836,26 @@ const ithNodeInLastLevel = function(root, i, length){
 ```
 
 
+## Validate Binary Search Tree
+
+Given a binary tree, determine if it is a valid binary search tree
+
+<a href="https://ibb.co/WkMbRf8"><img src="https://i.ibb.co/rxzCXH8/image.png" alt="image" border="0"></a>
+
+## Contraints
+
+- Are there duplicate values in the tree? If so, how do we handle them?
+  
+
 # General tips to solving problems
+
+Step
+1. Ask questions about constraints to the problem
+2. Write out a best case, worst case, and edge cases
+
 
 - Write down absolutelty everything that we know during a small step
   - Arrays
     - Length of the array
     - If certain values only appear to the left or right
     - If the question is in **sorted order** we probably need **binary search**
-
-
-## Validate Binary Search Tree
-
-Given a binary tree, determine if it is a valid binary search tree
