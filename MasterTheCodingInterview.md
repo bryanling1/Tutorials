@@ -43,6 +43,16 @@
   - [Validate Binary Search Tree](#validate-binary-search-tree)
   - [Contraints](#contraints)
     - [Idea](#idea-1)
+- [Heaps](#heaps)
+  - [Heap insertion](#heap-insertion)
+  - [Heap Deletion](#heap-deletion)
+  - [Implementation](#implementation)
+- [2D arrays](#2d-arrays)
+  - [Number of Islands](#number-of-islands)
+    - [Constraints](#constraints)
+    - [Idea](#idea-2)
+  - [Space and Time complexity](#space-and-time-complexity)
+    - [Time complexity](#time-complexity)
 - [General tips to solving problems](#general-tips-to-solving-problems)
 # Palindromes
 
@@ -883,6 +893,197 @@ const dfs = function(root, min, max){
 ```
 - We can't just `return dfs(node.left, min, node.val)` when we check the children because we need to make sure we check both the left and right children.
 
+# Heaps
+
+- Resembles a **complete BTS**
+- Max Heap and Min Heap
+- Root node has the Max/Min value
+- We can represent with an array in BFS form
+- **Parent:** `floor((index - 1)/2)`
+- **Left:** `2*index + 1`
+- **Right:** `2*index + 2`
+- Priority Queue is essentailly a heap
+  
+## Heap insertion
+
+1. Insert element at end of the array
+2. keep swapping up until into the right place
+  
+
+## Heap Deletion
+1. Remove the top value
+2. Take the last element in the array and move to the top then perk down
+3. If its a `max heap`, with swap with the value that is **greater** than the top. If they are both greater, go with the one with the **larger** value as to maintain the heep structure
+
+## Implementation
+
+```js
+class Priority Queue(
+  constructor( comparator = (a,b) => a > b){
+    this._heap = [];
+    this._comparator = comparator;
+  }
+
+  size(){
+    return this._heap.length;
+  }
+
+  isEmpty(){
+    return this.size() === 0;
+  }
+
+  peek(){
+    return this._heap[0];
+  }
+
+  _parent(index){
+    return Math.floor((index - 1)/2);
+  }
+
+  _leftChild(index){
+    return index * 2 + 1;
+  }
+
+  _rightChild(index){
+    return index*2 + 2;
+  }
+
+  _swap(index1, index2){
+    const temp = this._heap[index1];
+    this._heap[index1] = this._heap[index2];
+    this._heap[index2] = temp;
+  }
+
+  _compare(i,j){
+    return this._comparator(this._heap[i], this._heap[j])
+  }
+
+  push(value){
+    this._heap.push(value);
+    this._siftUp();
+    return this.size();
+  }
+
+  _siftUp(){
+    let nodeIndex = this._size() - 1;
+    while(nodeIndex > 0 && this._compare(nodeIndex, this_parent(nodeIndex))){
+      this._swap(nodeIndex, this._parent(nodeIndex));
+      nodeIndex = this._parent(nodeIndex);
+    }
+  }
+
+  pop(){
+    if(this.size() > 1){
+      this._swap(0, this.size() - 1);
+    }
+    const poppedValue = this._heap.pop();
+    this._siftDown();
+    return poppedValue;
+  }
+
+  _siftDown(){
+    let nodeIndex = 0;
+    while(
+      (this._leftChild(nodeIndex) < this.size() &&
+      this._compare(this._leftChild(nodeIndex), nodeIndex))) ||
+      (this._rightChild(nodeIndex) < this.size() &&
+      this._compare(this._rightChild(nodeIndex), nodeIndex))) 
+    ){
+      const greaterNodeIndex = this._rightChild(nodeIndex) < this.size() && this.compare(this._rightChild(nodeIndex), this._leftChild(nodeIndex)) ? 
+                            this._rightChild(nodeIndex) : this.leftChild(nodeIndex);
+      this._swap(greaterNodeIndex, nodeIndex);
+         nodeIndex = greaterNodeIndex;
+  }
+
+)
+```
+- `_` means `private`
+
+# 2D arrays
+
+## Number of Islands
+
+Given a @D array containing only 1's (land) and 0's(water), count the number of islands.
+Islands are attacked horizontally and vertically
+
+<a href="https://ibb.co/JQMSgKj"><img src="https://i.ibb.co/7460LXt/image.png" alt="image" border="0"></a>
+
+### Constraints
+
+Are the outsides water? Yes
+
+### Idea
+- Have a counter, every time we hit a 1, if it is a new island, increment the counter
+- We can start by searching **sequantly** until we hit a 1
+- Then traverse that 1 until all the corners are 0
+- We can then **switch all the values to 0** of that island and search again (to prevent reading over the same values)
+- We can then traverse with BFS and DFS in up, right, down, left directions
+
+Using BFS:
+```js
+const directions = [
+  [-1, 0],
+  [0, 1],
+  [1, 0],
+  [0, -1]
+]
+
+const numberOfIslands = function(matrix){
+  if(matrix.length === 0) return 0;
+
+  let islandCount = 0;
+
+  for(let row=0; row<matrix.length; row++){
+    for(let col=0; col<matrix[0].length; col++){
+      if(matrix[row][col] === 1){
+        //Found a island
+        islandCount ++;
+        matrix[row][col] = 0;
+        const queue = [];
+        queue.push([row, col]);
+        
+        while(queue.length){
+          const currentPost = queue.shift();
+          const currentRow = currentPos[0];
+          const currentCol = currentPos[1];
+          
+          for(let i=0; i<directions.length; i++){
+            const currentDir = directions[i];
+            const nextRow = currentRow + currendDir[0]
+            const nextCol = currentCol + currentDir[1]
+            //make sure the new coordinates are real in our matrix
+            if( nextRow < 0 || nextRow >= matrix.length || nextCol < 0 || nextCol >= matrix[0].length){
+              continue;
+            }
+
+            if(matrix[nextRow][nextCol] === 1){
+              queue.push([nextRow, nextCol]);
+              //flip the value
+              matrix[nextRow][nextCol] = 0;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return islandCount;
+}
+```
+
+## Space and Time complexity
+
+### Time complexity
+- BFS
+  - Sequential part is O(n)
+  - Search is also O(n)
+  - Therefore O(n + n) == O(2n), since our inner BFS switches everything to 0, so there is no overlap
+  - Space complexity is related to the queue
+    - In worst case, the grid is filled with 1s
+    - Then our space complexity is O(max(rows, columns)) as diagnoal ( have not visited those directions yet so they will be in queue);
+- DFS
+  - Time: O(n)
+  - Space: Since we traverse to the bottom, in our worst case (when the entire matrix is all 1s) our stack spack os O( rows * columns) which yeilds a **worse space complexity* than BFS
 # General tips to solving problems
 
 Step
