@@ -53,6 +53,11 @@
     - [Idea](#idea-2)
   - [Space and Time complexity](#space-and-time-complexity)
     - [Time complexity](#time-complexity)
+- [Graphs](#graphs)
+  - [BFS](#bfs)
+  - [DFS](#dfs)
+  - [Time Needed to Inform all Employees](#time-needed-to-inform-all-employees)
+    - [Verify the constraints](#verify-the-constraints)
 - [General tips to solving problems](#general-tips-to-solving-problems)
 # Palindromes
 
@@ -1084,6 +1089,120 @@ const numberOfIslands = function(matrix){
 - DFS
   - Time: O(n)
   - Space: Since we traverse to the bottom, in our worst case (when the entire matrix is all 1s) our stack spack os O( rows * columns) which yeilds a **worse space complexity* than BFS
+
+# Graphs
+
+<a href="https://ibb.co/Xp7ScFv"><img src="https://i.ibb.co/WFkgmBY/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/TBs4mCs"><img src="https://i.ibb.co/QF4Pr54/image.png" alt="image" border="0"></a>
+
+## BFS
+
+Using a adjcancy matrix
+```js
+const list = [
+  [1, 3],
+  [0],
+  [3, 8],
+  [0, 4, 5, 2],
+  [3, 6],
+  [3],
+  [4, 7],
+  [6],
+  [2]
+]
+
+const traversalBFS = function(graph){
+  const queue = [0];
+  const values = [];
+  const seen = {};
+
+  while(queue.length){
+    const vertex = queue.shift();
+    values.push(vertex);
+    seen[vertex] = true;
+
+    const connections = graph[vertex];
+    for(let i=0; i<connections.length, i++){
+      const connection = collections[i];
+      if(!seen[connection]){
+        queue.push(connection):
+      }
+    }
+  }
+  return values;
+}
+```
+
+## DFS
+
+```js
+const list = [
+  ...
+]
+
+const values = [];
+const seen = [];
+
+const traverseDFS = function(vertex, graph, values, seen){
+  values.push(vertex);
+  seen[vertex] = true;
+
+  const connections = graph[vertex];
+  for(let i=0; i<connections.length; i++){ 
+    const connection = connections[i];
+    if(!seen[connection]){
+      traverseDFS(connection, graph, values, seen);
+    }
+  }
+}
+```
+
+## Time Needed to Inform all Employees
+
+A company has n employees with unique IDs from 0 to n-1. The head of the company has the ID headID. 
+
+You will receive a managers array where managers[i] is the ID of the manager for employee i. Each employee has one direct manager. The company head has no manager (managers head[ID] = -1). It's guaranteed the sobordination relationships will have a tree structure.
+
+The head of the company wants to inform all employees of nes. He will inform his direct subordinates who will inform their diret subordinates and so on until everyone knows the news. You will receive an `informTime` array where `informTime[i]` is the time it takes for employee `i` to inform all their direct subordinates. Return the total number of minutes it takes to inform all employees of the news.
+
+<a href="https://ibb.co/b2M0WxJ"><img src="https://i.ibb.co/YyFCR6Z/image.png" alt="image" border="0"></a>
+
+<a href="https://ibb.co/zx53wpr"><img src="https://i.ibb.co/h9MGvby/image.png" alt="image" border="0"></a>
+
+### Verify the constraints
+- Is it cyclic?
+  - No, since this is a tree structure
+- Unconnected
+  - Does every employee have a manager?
+
+```js
+var numOfMinutes = function(n, headID, manager, informTime) {
+    const graph = manager.map(()=>[]);
+    for(let i=0; i<n; i++){
+        if(manager[i] !== -1){
+            graph[manager[i]].push(i);
+        }
+    }
+    return dfs(headID, graph, informTime);
+};
+
+const dfs = function(head, graph, informTime){
+    if(!graph[head].length){
+        return 0;
+    }
+
+    let max = 0;
+    for(let i=0; i<graph[head].length; i++){
+        max = Math.max(max, informTime[head] + dfs(graph[head][i], graph, informTime));
+    }
+    return max;
+}
+
+```
+
+
+
 # General tips to solving problems
 
 Step
@@ -1096,3 +1215,5 @@ Step
     - Length of the array
     - If certain values only appear to the left or right
     - If the question is in **sorted order** we probably need **binary search**
+  - Graphs
+    - If we gen n-ary tree, it is most likely a graph question
