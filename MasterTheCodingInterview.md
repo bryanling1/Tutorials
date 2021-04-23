@@ -58,6 +58,10 @@
   - [DFS](#dfs)
   - [Time Needed to Inform all Employees](#time-needed-to-inform-all-employees)
     - [Verify the constraints](#verify-the-constraints)
+  - [Course Schedular](#course-schedular)
+    - [1. Verify the constraints](#1-verify-the-constraints)
+    - [Idea](#idea-3)
+    - [Topological Sort](#topological-sort)
 - [General tips to solving problems](#general-tips-to-solving-problems)
 # Palindromes
 
@@ -1200,6 +1204,81 @@ const dfs = function(head, graph, informTime){
 }
 
 ```
+
+## Course Schedular
+
+There are a total of n courses to take, labeld from 0 to n-1.
+
+Some courses have prerequisite courses. This is express as a piar i.e. [1,0] which indicates you must take course 0 before taking course 1.
+
+Given the total number of courses and an arra o f prerequisite piars. Return if it is possible to finish all courses.
+
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/dPJcwzM/image.png" alt="image" border="0"></a>
+
+### 1. Verify the constraints
+- Can we have courses unconnected to other courses
+  - Yes
+
+### Idea
+  - First build an adgancancy list
+  - We don't know the connections of nodes, so we have to traverse through every single node
+    - There is a more optimal algorithm
+
+### Topological Sort
+
+- **indegree**: How many arrows point towards a vertex
+- Only take the nodes with `indegree = 0`. 
+- T
+- Visit each next node and lower the **indegree** value of each node we reach
+- Then remove the start position from the graph
+- Order doesn't matter
+- Only works with **DAG**
+  - **D:** Directed
+  - **A:** Acyclic
+  - **G:** Graph
+- Won't work if non-cyclic
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/gTG5XHc/image.png" alt="image" border="0"></a>
+
+```js
+const canFinish = function(n, prerequisits){
+  const inDegree = new Array(n).fill(0)
+  const adjList = inDegree.map(()=>[])
+
+  for(let i=0; i<prerequisits.length; i++){
+    const pair = prerequisits[i];
+    inDegree[pair[0]] ++;
+    adjList[pair[1]].push(pair[0]);
+  }
+
+  const stack = [];
+  for (let i=0; i<inDegree.length; i++){
+    if (inDegree[i] === 0){
+      stack.push(i)
+    }
+  }
+  let count = 0;
+  while(stack.length){
+    const current = stack.pop();
+    count ++;
+    const adjacent = adjList[current];
+    for(let i=0; i< adjacent.length; i++){
+      const next = adjacent[i];
+      inDegree[next] --;
+      if(inDegree[next] === 0){
+        stack.push(next)
+      }
+    }
+  }
+
+  return count === n;
+}
+```
+  
+
+
+
+
 
 
 
