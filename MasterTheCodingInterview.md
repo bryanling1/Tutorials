@@ -62,6 +62,17 @@
     - [1. Verify the constraints](#1-verify-the-constraints)
     - [Idea](#idea-3)
     - [Topological Sort](#topological-sort)
+  - [Network Time Delay](#network-time-delay)
+    - [Idea](#idea-4)
+    - [Greedy Method](#greedy-method)
+    - [Dijkstra's Algorithm](#dijkstras-algorithm)
+    - [Time and Space complexity](#time-and-space-complexity)
+    - [Priority Queue](#priority-queue)
+    - [Negative weights](#negative-weights)
+    - [Bellman-Ford Algorithm](#bellman-ford-algorithm)
+      - [Idea](#idea-5)
+      - [Time and Space Complexity](#time-and-space-complexity-1)
+- [Dynamic Programming](#dynamic-programming)
 - [General tips to solving problems](#general-tips-to-solving-problems)
 # Palindromes
 
@@ -1211,7 +1222,7 @@ There are a total of n courses to take, labeld from 0 to n-1.
 
 Some courses have prerequisite courses. This is express as a piar i.e. [1,0] which indicates you must take course 0 before taking course 1.
 
-Given the total number of courses and an arra o f prerequisite piars. Return if it is possible to finish all courses.
+Given the total number of courses and an array of prerequisite pairs. Return if it is possible to finish all courses.
 
 
 <a href="https://imgbb.com/"><img src="https://i.ibb.co/dPJcwzM/image.png" alt="image" border="0"></a>
@@ -1276,11 +1287,139 @@ const canFinish = function(n, prerequisits){
 ```
   
 
+## Network Time Delay 
 
+There are n network nodes labelled 1 to N. Given a times array, containing edges represented by arrays [u, v, w] where us is the source node, v is the target node, and w is the time taken to travel from the soruce node to the target nocde. 
 
+Send a signal from node k, return how long it takes for all nodes to receive the signa. Return -1 if it's impossible
 
+<a href="https://ibb.co/1zHgh05"><img src="https://i.ibb.co/Z2yjtfP/image.png" alt="image" border="0"></a>
 
+### Idea
+- Ther are multiple ways to traverse to a node, we want the fastest path
+- The K value can determine whether or not we can traverse
+  - Since there are directed edges
+- If the graph is disconnected, then return `-1`
+- If we ever come across a question that involves **directed and weighted** graphs, we should use these 2 algorithms
+- Store the **shortest** length between each 2 nodes using DFS
+  - We need a better algorithm becuase we would be recounting nodes we have visited already
 
+### Greedy Method
+- Use for Optimizatin Problems
+  - Math or min
+
+### Dijkstra's Algorithm
+
+- Applied to graphs that are directed and weighted
+- What is the shorted path we can take to reach from one node to all other nodes
+- Extension of Greedy Method
+- Start with an array of infinity (since we want to find the minimum every turn)
+- To get the next smallest, we ideally want to use a `priority queue`
+- Not designed for negative weight cycles as it will keep running
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/pyyZsDg/image.png" alt="image" border="0"></a>
+
+```js
+const networkDelayTime = function(times, N, k){
+  const distances = new Array(N).fill(Infinity);
+  const adjList = newArray(distances).map(()=>[]);
+  distances[k-1] = 0;
+  const heap = new ProirityQueue((a,b)=>distances[a] < distances[b]>);
+  heap.push(k-1);
+
+  //Fill out adj list
+  for(let i=0; i< times.length; i++){
+    const source = times[i][0]
+    const target = times[i][1]
+    const weight = times[i][2]
+    adjList[source - 1].push([target - 1, weight])
+  };
+  //perform algorithm
+  while(!heap.isEmpty()){
+    const currentVertex = heap.pop();
+    const adjacent = adjList[currentVertix];
+    for(let i=0; i< adjacent.length; i++){
+      const neighboringVertex = adjacent[i][0];
+      const weight = adjacent[i][1];
+      if(distances[currentVertex] + weight < distances[neighboringVertex]){
+        distances[neighboringVertex] = distances[currentVertex] + weight;
+        heap.push(neighboringVertex);
+      }
+    }
+  }
+
+  const answer = Math.max(...distances)
+
+  return answer === Infinity ? -1 : answer;
+
+}
+```
+
+### Time and Space complexity
+- Time is `Edges * logn` because everytime we loop the add to the heap
+  - Actual is `Edges * logn + n * logn`, but sinces edges is  usually greater
+- Time complexity is `O(E + N)`
+
+### Priority Queue
+
+Our queue assumes that we don't want to add the same values if it is already in the queue
+
+An optimal one would assume we don't allow for duplicates
+
+Time complexity would grow to `logE` and space would grow to `E + E`
+
+### Negative weights
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/f1sFqSK/image.png" alt="image" border="0"></a>
+
+- We essentiall can't use greedy
+- Our code will work, but now our time complexity is not guaranteed becuase it could keep checking for values
+  - This is because we don't actually check if we've visited a node or note
+
+### Bellman-Ford Algorithm
+- Can be used to account for negative weights
+- Uses Dynamic Programming
+- Also does not work if there is a negative cycle
+  - However, we can use it to detect if there is
+  - Go an additional iteration and see if any of the values change
+
+The only way to determine if we have the least costing path is to explore every possible path
+
+This is where Dynamic Programming comes into play
+
+#### Idea
+- Worst case, we have to pass through N - 1 edges to reach every single node
+- Loop through each connection
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/yWPdbg3/image.png" alt="image" border="0"></a>
+
+```js
+const networkDelayTime = function(times, N, k) {
+  const distances = new Array(N).fill(Infinity);
+  disances[k-1] = 0;
+  for(let i=0; i< N-1; i++){
+    let count = 0;
+    for(let j=0; j< times.length; j++){
+      const source = times[j][0];
+      const target = times[j][1];
+      const weight = times[j][2];
+      if(disatnces[source] + weight , distances[target]){
+        distances[target] = distances[source] + weight; 
+        count++
+      }
+    }
+    if (count === 0) break;
+  }
+
+  const ans = Math.max(...distances);
+  return ans === Infinity ? -1 : ans;
+}
+```
+#### Time and Space Complexity
+Time: O(N*E)
+S: O(N)
+
+# Dynamic Programming
 
 # General tips to solving problems
 
@@ -1295,4 +1434,4 @@ Step
     - If certain values only appear to the left or right
     - If the question is in **sorted order** we probably need **binary search**
   - Graphs
-    - If we gen n-ary tree, it is most likely a graph question
+    - If we get n-ary tree, it is most likely a graph question
