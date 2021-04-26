@@ -73,7 +73,19 @@
       - [Idea](#idea-5)
       - [Time and Space Complexity](#time-and-space-complexity-1)
 - [Dynamic Programming](#dynamic-programming)
+  - [Minimum cost of climbing stairs](#minimum-cost-of-climbing-stairs)
+    - [Space and time complexit](#space-and-time-complexit)
+    - [Bottom Up Approach](#bottom-up-approach)
+    - [Steps Summary](#steps-summary)
+  - [Knight Probability In Chessboard](#knight-probability-in-chessboard)
+    - [Using Memo](#using-memo)
+    - [Convert to bottom up](#convert-to-bottom-up)
+    - [Bottom Up Optimization](#bottom-up-optimization)
+- [Backtracking](#backtracking)
+  - [Idea of all backtracking functions Pseudo code](#idea-of-all-backtracking-functions-pseudo-code)
+  - [Soduku Solver](#soduku-solver)
 - [General tips to solving problems](#general-tips-to-solving-problems)
+- [Questions to practice](#questions-to-practice)
 # Palindromes
 
 - Often appear as string sub problems
@@ -1421,6 +1433,268 @@ S: O(N)
 
 # Dynamic Programming
 
+- Uses Recursion
+
+## Minimum cost of climbing stairs
+
+For a given staircase, the i-th step is assigned a non-negative cost inicated by a cost array. 
+
+Once you pay the cost for a step, you can either climb one or two steps. Find the **minimum** cost to reach the top of the starcase. Your first step can either be the first or second step
+
+Since we see **minimum** we can infer this is an optimization question. Therefore we have to generate very possibility and use dynamic programming to optimize
+
+<a href="https://ibb.co/7y8tWDY"><img src="https://i.ibb.co/kck28TH/image.png" alt="image" border="0"></a>
+
+```js
+const minCostClimbingStairs = function(cost){
+  const n = cost.length;
+  const dp = {};
+  return Math.min(minCost(n-1, cost, dp), minCost(n-2, cost, dp))
+}
+
+const minCost = function(i, cost, dp){
+  if(i< 0) return 0;
+  if (i <= 1) return cost[i];
+
+  if(dp[i] !== undefined){
+    return dp[i]
+  }else{
+    dp[i] =  cost[i] + Math.min(minCost(i-1, cost) , minCost(i-2, cost));
+    return dp[i]
+  }
+}
+```
+
+### Space and time complexit
+- We have to call our function twice for every n so time is `2^n`
+- Our call stack goes down a branch, which will be `n` as our space complexity
+
+### Bottom Up Approach
+
+We remove the recursion as it removes the call stack that comes wtih recursion
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/GCYn1wj/image.png" alt="image" border="0"></a>
+
+```js
+const minCostClimbingStairs = function(cost){
+  const n = cost.length;
+  if(n===0) return 0;
+  if(n ===1) return cost[0];
+  let dp1 = cost[0];
+  let dp2 = cost[1];
+
+  for(let i=2; i<n; i++){
+    const current = cost[i] + Math.min(dp1, dp2);
+    dp1 = dp2;
+    dp2 = current;
+  }
+  return Math.min(dp1, dp2);
+}
+```
+
+### Steps Summary
+
+1. Identify the recursion relation formula
+2. Built it from top down
+3. See if we can find an optimization using memiozation
+4. If we can go top down, we can go bottom up itteratively
+5. Reduce any wasted space
+
+## Knight Probability In Chessboard
+
+On a given n x n chessboard, a knigh piece wills tart at the r-th row and c-t column. The knight will attempt to make k moves. 
+
+A knight can move in 8 possible ways. Each move will choose on of these 8 at random. The knigh tcontinue moving until it finishes k moves or it moves off the chessboard. Return the probability that the knight is on the chessboard after it finishes moving.
+
+```js
+const moves = [
+  [-2, 1],
+  [-1, 2],
+  [1, 2],
+  [2, 1],
+  [2, -1],
+  [1, -2],
+  [-1, -2],
+  [-2, -1]
+]
+const chess = function(n, r, c, k){
+  if(n <= 0) return 0;
+  return dfs(n, r, c, k);
+  
+}
+
+const dfs = function(n, r, c, k){
+  if(r < 0 || r > n - 1 || c < 0 || c > n-1) return 0;
+  if(k < 0) return 1;
+
+  let res = 0;
+  for(let i=0; i<moves.length; i++){
+    const newR = r + moves[i][0];
+    const newC = c + moves[i][1];
+    res = res +  dfs(n, newR, newC, k-1) / 8;
+  }
+   return res;
+}
+```
+
+### Using Memo
+```js
+const moves = [
+  [-2, 1],
+  [-1, 2],
+  [1, 2],
+  [2, 1],
+  [2, -1],
+  [1, -2],
+  [-1, -2],
+  [-2, -1]
+]
+
+var knightProbability = function(n, k, row, column) {
+    const dp = new Array(k + 1).fill(0).map(()=>new Array(n).fill(0).map(()=>new Array(n).fill(undefined)))
+
+  return recurse(n, k, row, column, dp);
+};
+
+const recurse = function(n, k, r, c, dp){
+  if(r < 0 || r >= n || c < 0 || c >= n) return 0;
+  if(k === 0) return 1;
+
+  if(dp[k][r][c] !== undefined){
+    return dp[k][r][c];
+  }
+  let res = 0;
+  for(let i=0; i<moves.length; i++){
+    const newR = r + moves[i][0];
+    const newC = c + moves[i][1];
+    res +=  recurse(n,  k-1, newR, newC, dp) / 8;
+  }
+  dp[k][r][c] = res;
+  return dp[k][r][c];
+}
+```
+### Convert to bottom up
+
+We identify that `k` is the dribing variable in our solution
+
+We completely fill out one grid before moving onto the next stage (increase K)
+
+<a href="https://ibb.co/R7v3FnY"><img src="https://i.ibb.co/nRg7G26/image.png" alt="image" border="0"></a>
+- Each grid represents the probability of reaching the new location from the previous board states
+- Add up all the probabilities in the last board state
+
+```js
+const directions = [
+  [-2, 1],
+  [-1, 2],
+  [1, 2],
+  [2, 1],
+  [2, -1],
+  [1, -2],
+  [-1, -2],
+  [-2, -1]
+]
+
+const knightProbability = function(N, k, r, c){
+  const dp = new Array(k+1).fill(0).map(()=>new Array(N).fill(0).map(()=>new Array(N).fill(0)))
+
+  dp[0][r][c] = 1;
+  for(let step=1; step<=k, step++){
+    for(let row = 0; row < r; row++){
+      for(let col=0; col<N; col++){
+        for(let i=0; i<directions.length; i++){
+          const dir = directions[i];
+          const prevRow = row + dir[0];
+          const prevCol = col + dir[1];
+          if(prevRow >= 0 && prevCol >=0 && prevRow < N && prevCol < N){
+            dp[step][row][col] += dp[step-1][prevRow]prevCol]/8
+          }
+        }
+      }
+    }
+  }
+
+  let res = 0;
+  for(let i=0; i<N; i++){
+    for(let j=0; j<N; j++){
+      res += dp[k][i][j];
+    }
+  }
+  return res;
+}
+```
+
+### Bottom Up Optimization
+
+We only need 2 arrays to keep track of the previous and next array
+
+```js
+
+
+const knightProbability = function(N, k, r, c){
+  const prevdp = new Array(N).fill(0).map(()=>new Array(N).fill(0))
+  const currentDp = new Array(N).fill(0).map(()=>new Array(N).fill(0))
+
+  prevDp[0][r][c] = 1;
+  for(let step=1; step<=k, step++){
+    for(let row = 0; row < r; row++){
+      for(let col=0; col<N; col++){
+        for(let i=0; i<directions.length; i++){
+          const dir = directions[i];
+          const prevRow = row + dir[0];
+          const prevCol = col + dir[1];
+          if(prevRow >= 0 && prevCol >=0 && prevRow < N && prevCol < N){
+            currentdp[step][row][col] += prevdp[step-1][prevRow]prevCol]/8
+          }
+        }
+      }
+    }
+    prevdb = currentdp;
+    currentdp = new Array(N).fill(0).map(()=>new Array(N).fill(0))
+  }
+
+  let res = 0;
+  for(let i=0; i<N; i++){
+    for(let j=0; j<N; j++){
+      res += prevdp[i][j];
+    }
+  }
+  return res;
+}
+```
+
+# Backtracking
+
+- Return All solutions
+- Return a valid solution amongst all solutions
+- A brute force solution
+
+## Idea of all backtracking functions Pseudo code
+
+```
+recursive function(args, ans){
+  for(...){
+    ans.push(currentVal) //add
+    if(isValid()){       //decision
+      function(args, ans) 
+    }
+    remove currentVal from ans //remove
+  }
+}
+```
+
+## Soduku Solver
+
+Create a function that solves for any 9x9 soduku problem
+
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/pjcyTYY/image.png" alt="image" border="0"></a>
+
+
+
+
+
+
+
 # General tips to solving problems
 
 Step
@@ -1435,3 +1709,6 @@ Step
     - If the question is in **sorted order** we probably need **binary search**
   - Graphs
     - If we get n-ary tree, it is most likely a graph question
+
+# Questions to practice
+
