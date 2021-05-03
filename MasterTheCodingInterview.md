@@ -84,6 +84,7 @@
 - [Backtracking](#backtracking)
   - [Idea of all backtracking functions Pseudo code](#idea-of-all-backtracking-functions-pseudo-code)
   - [Soduku Solver](#soduku-solver)
+- [Tries](#tries)
 - [General tips to solving problems](#general-tips-to-solving-problems)
 - [Questions to practice](#questions-to-practice)
 # Palindromes
@@ -927,7 +928,7 @@ const dfs = function(root, min, max){
 
 # Heaps
 
-- Resembles a **complete BTS**
+- Resembles a **complete BST**
 - Max Heap and Min Heap
 - Root node has the Max/Min value
 - We can represent with an array in BFS form
@@ -1688,6 +1689,11 @@ recursive function(args, ans){
 Create a function that solves for any 9x9 soduku problem
 
 <a href="https://imgbb.com/"><img src="https://i.ibb.co/pjcyTYY/image.png" alt="image" border="0"></a>
+
+# Tries
+
+- Generally an implementation question related to autocomplete or something
+
 
 
 
