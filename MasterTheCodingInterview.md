@@ -1054,53 +1054,59 @@ Are the outsides water? Yes
 
 Using BFS:
 ```js
-const directions = [
-  [-1, 0],
-  [0, 1],
-  [1, 0],
-  [0, -1]
+var numIslands = function(grid) {
+    let count = 0;
+    for(let row=0; row < grid.length; row ++){
+        for(let col=0; col< grid[0].length; col++){
+            if(grid[row][col] === '1'){
+                count ++;
+                // grid[row][col] = 0;                   
+                dfs(grid, row, col);
+            }                                   
+        } 
+    }
+    return count;
+};
+
+const DIRECTIONS = [
+    [-1, 0],
+    [0, 1],
+    [1, 0],
+    [0, -1]
 ]
 
-const numberOfIslands = function(matrix){
-  if(matrix.length === 0) return 0;
-
-  let islandCount = 0;
-
-  for(let row=0; row<matrix.length; row++){
-    for(let col=0; col<matrix[0].length; col++){
-      if(matrix[row][col] === 1){
-        //Found a island
-        islandCount ++;
-        matrix[row][col] = 0;
-        const queue = [];
-        queue.push([row, col]);
-        
-        while(queue.length){
-          const currentPost = queue.shift();
-          const currentRow = currentPos[0];
-          const currentCol = currentPos[1];
-          
-          for(let i=0; i<directions.length; i++){
-            const currentDir = directions[i];
-            const nextRow = currentRow + currendDir[0]
-            const nextCol = currentCol + currentDir[1]
-            //make sure the new coordinates are real in our matrix
-            if( nextRow < 0 || nextRow >= matrix.length || nextCol < 0 || nextCol >= matrix[0].length){
-              continue;
+const bfs = function(grid, row, col){
+    const queue = [[row, col]];
+    while(queue.length > 0){
+        const [currentRow, currentCol ] = queue.shift();
+        for (const direction of DIRECTIONS){
+            const newRow = currentRow + direction[0];
+            const newCol = currentCol + direction[1];
+            if(newRow < 0 || newRow >= grid.length || newCol < 0 || newCol >= grid[0].length){
+                continue;   
             }
-
-            if(matrix[nextRow][nextCol] === 1){
-              queue.push([nextRow, nextCol]);
-              //flip the value
-              matrix[nextRow][nextCol] = 0;
+            
+            if(grid[newRow][newCol] === '1'){
+                queue.push([newRow, newCol]);
+                grid[newRow][newCol] = 0;
             }
-          }
+                
         }
-      }
     }
-  }
+}
 
-  return islandCount;
+const dfs = function(grid, row, col){
+    if(row < 0 || row >= grid.length || col < 0 || col >= grid[0].length || grid[row][col] !== '1'){
+        return;  
+    }
+    grid[row][col] = 0;
+    for(let direction of DIRECTIONS){
+        const newRow = row + direction[0];
+        const newCol = col + direction[1];
+        dfs(grid, newRow, newCol);
+    }
+    
+    return;
 }
 ```
 
@@ -1715,6 +1721,7 @@ Step
     - If the question is in **sorted order** we probably need **binary search**
   - Graphs
     - If we get n-ary tree, it is most likely a graph question
-
+  -Dynamic Programing
+    - See if you can start with an array / matrix of values to fill in as you go
 # Questions to practice
 
