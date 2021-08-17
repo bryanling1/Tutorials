@@ -4,6 +4,7 @@
 - [Table of contents](#table-of-contents)
 - [Previous Props Hook](#previous-props-hook)
 - [Drag and Drop](#drag-and-drop)
+- [Context api](#context-api)
 ## Previous Props Hook
 ```jsx
 import {useRef} from 'react';
@@ -131,4 +132,47 @@ class App extends Component {
 }
 ```
 
+## Context api
+```jsx
+import { createContext, useReducer } from 'react';
 
+export const AppContext = createContext({
+  user: null,
+  addUser: function(user){}
+})
+
+export const AppContextProvider = (props) => {
+  const [users, dispatch] = useReducer((state, action)=>{
+    return [...state, ...action]
+  }, [{name: 'Francis', {name:'Mike'}}]) //defaults
+
+  const handlAddUser = (user) => {
+    dispatch([user])
+  }
+
+  return(
+    <AppContext.Provider
+      value={{
+        users: users,
+        addUser: handleAddUser
+      }}
+    >
+      {props.children}
+    </AppContext.Provider>
+  )
+}
+export 
+```
+- Wrap all of `app.js`
+
+Now to use the data:
+```jsx
+import {useContext} from 'react';
+import { AppContext } from '../store/app_context';
+
+const Comp = () =>{
+  const appCtx = useContext(AppContext);
+  ...
+}
+
+```

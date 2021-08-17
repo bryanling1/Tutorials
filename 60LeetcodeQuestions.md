@@ -21,7 +21,7 @@
 
 - Do toroise and the hair to detect if there is a cycle
 - Add a pointer to the `start` and `intersect` point
-- Whene these 2 pointers intersect its the start of the loop
+- When these 2 pointers intersect its the start of the loop
 
 #  Remove duplicates from sorted list
 

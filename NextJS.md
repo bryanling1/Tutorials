@@ -27,6 +27,20 @@
       - [`getStaticPaths`](#getstaticpaths)
       - [`getServerSideProps`](#getserversideprops)
     - [Client Side Fetching](#client-side-fetching)
+  - [APIs](#apis)
+    - [Get requests](#get-requests)
+    - [Post requests](#post-requests)
+    - [Dynamic API routes](#dynamic-api-routes)
+    - [Connecting to Mongoose](#connecting-to-mongoose)
+      - [Setup](#setup)
+      - [Issue with models](#issue-with-models)
+    - [Redux Work Arounds](#redux-work-arounds)
+  - [Deploying](#deploying)
+    - [Checking for optimizations](#checking-for-optimizations)
+    - [Config file](#config-file)
+    - [Building](#building)
+    - [Deploying to Vercel](#deploying-to-vercel)
+      - [Making Changes](#making-changes)
 
 ## Install
 ```bash
@@ -362,3 +376,174 @@ If we create an app that gets post, we could use `getStaticProps` to get the fir
 We would initiliaze the state with the data fetched from `getStaticProps`.
 
 This is good for SEO.
+
+## APIs
+
+Created in `/api` 
+
+Requests are made to `/api/filename`
+
+### Get requests
+
+Similar to express:
+
+```js
+const handler = async (req, res) => {
+  if(req.method === 'GET'){
+    res.status(200).json({...})
+  }
+}
+
+export default handler;
+```
+- cannot be used in `getStaticProps` because that's already on the server
+
+### Post requests
+
+```js
+const handler = async (req, res) =>{
+  if(req.method === 'POST'){
+    const {title, body} = req.body;
+
+    try{
+      const request = await axios.post("...", {title, body})
+      res.status(200).json({
+        data: request.data
+      })
+    }catch(err){
+      res.status(401).json({
+        message:"bad"
+      })
+    }
+  }
+}
+```
+
+### Dynamic API routes
+
+Same notation as pages with `[id].js`
+
+```js
+import axios from 'axios';
+
+const handler = async(req, res)=>{
+  const id = req.query.id;
+  ...
+}
+```
+
+### Connecting to Mongoose
+
+#### Setup
+
+`npm install mongoose`
+
+Setup in `/helpers/database/mongoose_db.js`
+
+```jsx
+import mongoose from 'mongoose';
+
+export async function connectToDb(){
+  if(mongoose.connection.readyState >= 1) return; //already have a connection
+
+  return mongoose.connect("...", {
+    useNewUrlParser: true,
+    useUnifiedTopolofy: true,
+    useFindAndModify: true
+  })
+}
+}
+```
+
+#### Issue with models
+
+We will run into an error when using models saying `Cannot overwrite 'Name' model once compiled`
+
+This occurs because of NextJS's hot-reloading.
+
+Fix:
+```js
+const Post = mongoose.models.Post || mongoose.model('Post', postsSchema);
+export default Post;
+```
+- A new model won't be created if it already exists
+- Some libraries won't have this work around as nextJS works differently
+
+### Redux Work Arounds
+
+We need to install `next-redux-wrapper`
+
+```jsx
+import {Provider} from 'react-redux'
+import {createWrapper} from 'next-redux-wrapper'
+import store from '../store'
+
+function myApp({Component, pageProps}){
+  return(
+    <Provider store={store}>
+      <Component {...pageProps} />
+    </Provider>
+  )
+}
+
+const makeStore = () => store;
+const wrapper = createWrapper(makeStore);
+
+export default wrapper.withRedux(myApp);
+```
+
+## Deploying
+<img src="https://i.ibb.co/r4qjV9w/image.png" alt="image" border="0">
+- Not gonna get the stuff in red
+
+<img src="https://i.ibb.co/w4x1vf6/image.png" alt="image" border="0">
+
+### Checking for optimizations
+- Make sure to add headers and metatags
+- No Anchor tags, use `Link`
+
+### Config file
+
+Create `next.config.js`
+
+```js
+const {PHASE_DEVELOPMENT_SERVER} = require('next/constants');
+module.exports = (phase, { defaultConfig }) => {
+  if(phase === PHASE_DEVELOPMENT_SERVER){
+    return {
+      env:{
+       ...
+      }
+    }
+  }
+}
+```
+- `env` are environment variables
+  - Access via `process.env.name`
+- `PHASE_DEVELOPMENT_SERVER` is a constant that checks for dev environment
+  - `npm run dev`
+
+### Building
+We can add a scriptin `package.json`
+
+```json
+"scripts":{
+  ...
+  "export": "next export"
+}
+```
+
+### Deploying to Vercel
+
+Works with repositories [vercel.com](vercel.com)
+
+1. `git init`
+2. Put the repository on github
+3. Login to [vercel.com](vercel.com) via Github
+4. Import the Git Repository into Vercel
+5. Set settings like environment variables etc.
+6. Deploy
+
+#### Making Changes
+
+Whenever master is changed, it will update it
